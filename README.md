@@ -51,6 +51,8 @@ Output includes: PCIe topology, link speed/width, MaxPayload, IRQ affinity, CPU 
 
 ## Benchmark Results
 
+### LLM Inference
+
 Model: Qwen3-0.6B (W8A16) via AXCL runtime
 
 | Platform | PCIe | tok/s |
@@ -59,6 +61,21 @@ Model: Qwen3-0.6B (W8A16) via AXCL runtime
 | Raspberry Pi 5 | Gen2 x1 | ~13 |
 | **CM3588 (optimized)** | **Gen2 x1** | **12.0** |
 | CM3588 (default) | Gen2 x1 | 5-7 |
+
+### Vision Models (NPU inference, 640x640)
+
+| Model | Default (ms) | Optimized (ms) | Speedup | FPS |
+|-------|----------:|------------:|--------:|----:|
+| YOLO11s | 3.99 | **3.55** | +12% | 282 |
+| YOLOv8s | 4.21 | **3.89** | +8% | 257 |
+| YOLO11s-Seg | 5.27 | **4.60** | +13% | 217 |
+| YOLOv8s-Seg | 5.26 | **5.11** | +3% | 196 |
+| YOLOv5s | 6.92 | **6.59** | +5% | 152 |
+| YOLO26m | 9.47 | **9.04** | +5% | 111 |
+| YOLOv8s-Pose | 11.81 | **11.26** | +5% | 89 |
+| Depth-Anything-V2-S | 34.00 | **33.44** | +2% | 30 |
+
+Key effect on vision: **2-13% faster + 2-3x more stable** latency (critical for real-time pipelines).
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
