@@ -77,6 +77,40 @@ Model: Qwen3-0.6B (W8A16) via AXCL runtime
 
 Key effect on vision: **2-13% faster + 2-3x more stable** latency (critical for real-time pipelines).
 
+### Classification (NPU inference, 224x224)
+
+| Model | Default (ms) | Optimized (ms) | Speedup | FPS |
+|-------|----------:|------------:|--------:|----:|
+| MobileNetV2 | 0.983 | **0.657** | +50% | 1523 |
+| SqueezeNet1.1 | 0.786 | **0.768** | +2% | 1302 |
+| ResNet18 | 1.963 | **1.435** | +37% | 697 |
+| ResNet50 | 3.613 | **3.355** | +8% | 298 |
+
+### OCR — PPOCR_v5 (Text Detection + Recognition)
+
+| Model | Task | Default (ms) | Optimized (ms) | Speedup |
+|-------|------|----------:|------------:|--------:|
+| det_npu1 | Text Detection | 29.38 | **28.98** | +1% |
+| cls_npu1 | Text Direction | 0.759 | **0.445** | +71% |
+| rec_npu1 | Text Recognition | 3.958 | **3.681** | +8% |
+
+Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-99% accuracy).
+
+### Optimization Effect Pattern
+
+The speedup correlates inversely with inference time — faster models benefit more:
+
+| Inference time | Example | Speedup |
+|:-:|:-:|:-:|
+| < 0.5 ms | OCR classifier | **+71%** |
+| ~0.7 ms | MobileNetV2 | **+50%** |
+| ~1.4 ms | ResNet18 | **+37%** |
+| ~3.5 ms | ResNet50 | +8% |
+| ~7 ms | YOLOv5s | +5% |
+| ~29 ms | OCR detector | +1% |
+
+This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
+
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
 ## Requirements

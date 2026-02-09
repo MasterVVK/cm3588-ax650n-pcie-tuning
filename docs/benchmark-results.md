@@ -117,10 +117,131 @@ For real-time video pipelines (30 FPS = 33ms budget), the stability improvement 
 - "Cold" = first run after reboot (model loading from disk)
 - "Warm" = subsequent runs (model in page cache)
 
-## Vision Methodology
+## Classification Model Benchmarks
+
+### Test Configuration
+
+- **Models**: Exported from PyTorch `torch.hub` (torchvision v0.15.2), compiled with Pulsar2 5.1
+- **Tool**: `axcl_run_model` (pure NPU inference)
+- **Repeats**: 100 iterations, 10 warmup
+- **Input**: 224x224x3 (standard ImageNet input, except SqueezeNet 227x227)
+- **NPU mode**: 1 Core
+- **Quantization**: INT8, MinMax calibration, 32 random samples
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| MobileNetV2 | 0.983 | **0.657** | +49.6% | 1523 |
+| SqueezeNet1.1 | 0.786 | **0.768** | +2.3% | 1302 |
+| ResNet18 | 1.963 | **1.435** | +36.8% | 697 |
+| ResNet50 | 3.613 | **3.355** | +7.7% | 298 |
+
+### Analysis
+
+Classification models show the clearest correlation between model speed and optimization benefit:
+- **MobileNetV2** (+50%): Very fast inference (~0.7ms) makes PCIe overhead dominant
+- **ResNet18** (+37%): Still fast enough for significant benefit
+- **ResNet50** (+8%): Longer inference dilutes the PCIe overhead effect
+- **SqueezeNet1.1** (+2%): Despite fast inference, the model architecture may have different memory access patterns
+
+## OCR Benchmarks — PPOCR_v5
+
+### Test Configuration
+
+- **Models**: PPOCR_v5 from [HuggingFace AXERA-TECH](https://huggingface.co/AXERA-TECH/PPOCR_v5)
+- **Pipeline**: Detection (det) → Classification (cls) → Recognition (rec)
+- **Runtime**: PyAXEngine (axengine 0.1.3) via AXCL
+- **NPU mode**: 1 Core
+- **Test images**: Chinese + English text (16 text regions detected)
+
+### NPU Inference With vs Without Optimization
+
+| Model | Task | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------|------------------:|--------------------:|--------:|
+| det_npu1 | Text Detection | 29.38 | **28.98** | +1.4% |
+| cls_npu1 | Text Direction | 0.759 | **0.445** | +70.6% |
+| rec_npu1 | Text Recognition | 3.958 | **3.681** | +7.5% |
+
+### Analysis
+
+The OCR pipeline demonstrates the optimization effect pattern most clearly:
+- **cls** (0.45ms): +71% — the fastest model benefits most
+- **rec** (3.7ms): +8% — moderate inference time, moderate benefit
+- **det** (29ms): +1% — longest inference, negligible benefit
+
+Full OCR pipeline: ~1.5s per image (16 text regions, Chinese + English, 81-99% confidence).
+
+## Video Transcode Benchmarks
+
+### Test Configuration
+
+- **Tool**: `axcl_sample_transcode` (from axcl-samples)
+- **VPU**: AX650N hardware video encoder/decoder via PCIe
+- **Input**: 1080p H.264 test video
+
+### Results
+
+| Task | Resolution | FPS | Optimization Effect |
+|------|:----------:|----:|:-------------------:|
+| Decode only | 1080p | 260 | None (0%) |
+| Transcode H.264→H.265 | 1080p | ~28 | None (0%) |
+| Transcode H.264→H.265 | 720p | ~28 | None (0%) |
+
+### Analysis
+
+PCIe optimization has **zero effect** on video transcode:
+- VPU operations use DMA transfers, not IRQ-driven like NPU inference
+- The bottleneck is the hardware encoder (~28 FPS), not PCIe bandwidth
+- Decode is fast (260 FPS) — the encoder is the limiting factor
+- Different `hwclk` settings also had no effect
+
+This confirms the optimization specifically targets NPU inference workloads.
+
+## Optimization Effect Pattern
+
+The speedup from PCIe optimization correlates inversely with inference time:
+
+| Inference time | Model | Speedup |
+|:-:|:-:|:-:|
+| < 0.5 ms | OCR classifier (cls) | **+71%** |
+| ~0.7 ms | MobileNetV2 | **+50%** |
+| ~1.4 ms | ResNet18 | **+37%** |
+| ~3.5 ms | ResNet50 | +8% |
+| ~7 ms | YOLOv5s | +5% |
+| ~29 ms | OCR detector (det) | +1% |
+
+**Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
+
+For LLM inference, the effect is even more dramatic (+100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
+
+## Methodology
+
+### LLM
+
+- Each benchmark run: single prompt ("What is 2+2?" or similar short prompt)
+- TTFT measured by ax-llm runtime
+- Decode speed measured as average over full response generation
+- "Cold" = first run after reboot (model loading from disk)
+- "Warm" = subsequent runs (model in page cache)
+
+### Vision & Classification
 
 - `axcl_run_model -m model.axmodel -r 100 -w 10` (100 repeats, 10 warmup)
 - Pure NPU inference time (no image loading, no post-processing)
-- Models from HuggingFace (Pulsar2 compiled, w8a16 quantization)
+- Vision models from HuggingFace (Pulsar2 compiled, w8a16 quantization)
+- Classification models compiled locally with Pulsar2 5.1, INT8 MinMax
 - Default = IRQ on CPU0 (A55), schedutil governor
 - Optimized = IRQ on CPU4 (A76), performance governor
+
+### OCR
+
+- NPU inference time measured via PyAXEngine (axengine) internal timer
+- 100 runs averaged
+- Full pipeline tested on real images with mixed Chinese/English text
+
+### Video Transcode
+
+- `axcl_sample_transcode` with 1080p H.264 input
+- FPS measured over full video duration
+- Tested with and without optimization, multiple `hwclk` settings
