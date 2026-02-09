@@ -1,0 +1,14 @@
+[Unit]
+Description=AX650N PCIe Performance Optimization (IRQ affinity + CPU governor)
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ax650n-optimize.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
