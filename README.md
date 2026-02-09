@@ -25,7 +25,7 @@ This toolkit applies two optimizations that together provide **+100% improvement
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USER/cm3588-ax650n-pcie-tuning.git
+git clone https://github.com/MasterVVK/cm3588-ax650n-pcie-tuning.git
 cd cm3588-ax650n-pcie-tuning
 sudo ./install.sh
 ```

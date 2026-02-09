@@ -25,7 +25,7 @@ NPU AX650N (24 TOPS INT8), подключённый через M.2 на CM3588 N
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/YOUR_USER/cm3588-ax650n-pcie-tuning.git
+git clone https://github.com/MasterVVK/cm3588-ax650n-pcie-tuning.git
 cd cm3588-ax650n-pcie-tuning
 sudo ./install.sh
 ```

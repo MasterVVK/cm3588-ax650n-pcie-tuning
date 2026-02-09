@@ -25,7 +25,7 @@ AX650N NPU（24 TOPS INT8）通过 M.2 连接到 CM3588 NAS，LLM 推理速度�
 ## 快速开始
 
 ```bash
-git clone https://github.com/YOUR_USER/cm3588-ax650n-pcie-tuning.git
+git clone https://github.com/MasterVVK/cm3588-ax650n-pcie-tuning.git
 cd cm3588-ax650n-pcie-tuning
 sudo ./install.sh
 ```
