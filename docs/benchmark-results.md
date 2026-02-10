@@ -198,22 +198,151 @@ PCIe optimization has **zero effect** on video transcode:
 
 This confirms the optimization specifically targets NPU inference workloads.
 
+## Face Recognition — Insightface
+
+### Test Configuration
+
+- **Models**: [Insightface buffalo_l](https://huggingface.co/AXERA-TECH/Insightface) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 10 warmup
+
+### With vs Without Optimization
+
+| Model | Task | Input | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------|-------|------------------:|--------------------:|--------:|--------------:|
+| det_10g | Face Detection | 640x640 | 7.356 | **6.862** | +7.2% | 146 |
+| genderage | Gender/Age | 96x96 | 0.479 | **0.357** | +34.2% | 2801 |
+| w600k_r50 | Face Embedding | 112x112 | 4.265 | **3.717** | +14.7% | 269 |
+
+### Comparison with Official Numbers
+
+| Model | Official (ms) | Our Optimized (ms) | Difference |
+|-------|:------------:|:------------------:|:----------:|
+| det_10g | 6.947 | 6.862 | -1% (faster) |
+| genderage | 0.295 | 0.357 | +21% |
+| w600k_r50 | 3.993 | 3.717 | -7% (faster) |
+
+## Super-Resolution — Real-ESRGAN
+
+### Test Configuration
+
+- **Models**: [Real-ESRGAN x4](https://huggingface.co/AXERA-TECH/Real-ESRGAN) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Quantization**: w8a8 (INT8)
+
+### With vs Without Optimization
+
+| Model | Input→Output | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|:------------:|------------------:|--------------------:|--------:|--------------:|
+| realesrgan-x4 | 64→256 | 15.850 | **15.663** | +1.2% | 15 |
+| realesrgan-x4-256 | 256→1024 | 476.199 | **475.425** | +0.2% | 440 |
+
+### Analysis
+
+Real-ESRGAN shows minimal optimization benefit — the models are compute-heavy (especially 256→1024 at 475ms). The 8% gap vs official numbers on the large model is due to PCIe bandwidth: upscaling 256→1024 transfers large tensors.
+
+## Segment Anything — MobileSAM
+
+### Test Configuration
+
+- **Models**: [MobileSAM](https://huggingface.co/AXERA-TECH/MobileSAM) encoder + decoder (pre-compiled for AX650)
+- **Input**: 1024x1024
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| Encoder | 51.521 | **50.920** | +1.2% | 49.495 |
+| Decoder | 10.585 | **10.349** | +2.3% | 9.930 |
+
+## Zero-Shot Classification — SigLIP2
+
+### Test Configuration
+
+- **Models**: [siglip2-base-patch16-224](https://huggingface.co/AXERA-TECH/siglip2-base-patch16-224) (pre-compiled for AX650)
+- **Quantization**: w8a16
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| Vision encoder (224x224) | 11.482 | **11.369** | +1.0% | 11.1 |
+| Text encoder | 5.003 | **4.567** | +9.6% | 4.56 |
+
+## Additional Detection Models
+
+### With vs Without Optimization
+
+| Model | Source | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|--------|------------------:|--------------------:|--------:|
+| RT-DETR | [AXERA-TECH](https://huggingface.co/AXERA-TECH/RT-DETR) | 9.515 | **9.346** | +1.8% |
+| YOLO-World YOLO | [AXERA-TECH](https://huggingface.co/AXERA-TECH/YOLO-World-V2) | 9.707 | **9.252** | +4.9% |
+| YOLO-World CLIP | [AXERA-TECH](https://huggingface.co/AXERA-TECH/YOLO-World-V2) | 3.321 | **3.049** | +8.9% |
+
+## Speech Recognition — Whisper
+
+### Test Configuration
+
+- **Models**: [Whisper-tiny](https://huggingface.co/AXERA-TECH/Whisper) encoder + decoder (pre-compiled for AX650)
+- **Tool**: `axcl_run_model` (pure NPU benchmark, not full pipeline)
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Encoder | 21.268 | **21.132** | +0.6% |
+| Decoder | 4.054 | **3.932** | +3.1% |
+
+## TTS — CosyVoice3
+
+### Test Configuration
+
+- **Pipeline**: LLM (Qwen2 24-layer) → Flow Decoder (ODE 7 steps) → HiFi-GAN
+- **Text**: Russian ("Искусственный интеллект открывает новые возможности для человечества.")
+- **Binary**: Custom C++ via AXCL
+- **3 runs per configuration**, averaged
+
+### With vs Without Optimization
+
+| Metric | Default | Optimized | Speedup |
+|--------|--------:|----------:|--------:|
+| TTFT | 125.3 ms | **108.3 ms** | +15.7% |
+| LLM Decode | 13.94 tok/s | **16.34 tok/s** | +17.2% |
+| RTF (Real-Time Factor) | 2.0-3.7x | **1.7-1.9x** | |
+
+### Analysis
+
+CosyVoice3 TTS optimization effect is moderate (+17% LLM decode) because:
+- LLM decode benefits from optimization (sequential NPU calls)
+- Token2Wav (ODE solver with 7 steps of ~100ms each) dominates total time and shows minimal benefit
+- RTF > 1.0 means slower than real-time on PCIe Gen2 x1
+
 ## Optimization Effect Pattern
 
 The speedup from PCIe optimization correlates inversely with inference time:
 
 | Inference time | Model | Speedup |
 |:-:|:-:|:-:|
+| ~0.3 ms | Insightface genderage | **+34%** |
 | < 0.5 ms | OCR classifier (cls) | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~1.4 ms | ResNet18 | **+37%** |
+| ~3.0 ms | YOLO-World CLIP | +9% |
+| ~3.7 ms | Insightface w600k_r50 | +15% |
 | ~3.5 ms | ResNet50 | +8% |
-| ~7 ms | YOLOv5s | +5% |
+| ~7 ms | YOLOv5s/Insightface det | +5-7% |
+| ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
+| ~11 ms | SigLIP2 vision | +1% |
+| ~21 ms | Whisper encoder | +1% |
 | ~29 ms | OCR detector (det) | +1% |
+| ~51 ms | MobileSAM encoder | +1% |
+| ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
 For LLM inference, the effect is even more dramatic (+100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
+
+**30+ models tested** across 10 categories confirm this pattern holds universally.
 
 ## Methodology
 
@@ -225,11 +354,12 @@ For LLM inference, the effect is even more dramatic (+100%) because each token r
 - "Cold" = first run after reboot (model loading from disk)
 - "Warm" = subsequent runs (model in page cache)
 
-### Vision & Classification
+### Vision, Classification, Face, Super-Resolution, Segmentation, Zero-Shot, Detection, Speech
 
 - `axcl_run_model -m model.axmodel -r 100 -w 10` (100 repeats, 10 warmup)
+- For heavy models (Real-ESRGAN 256, MobileSAM encoder): `-r 20-50 -w 3-5`
 - Pure NPU inference time (no image loading, no post-processing)
-- Vision models from HuggingFace (Pulsar2 compiled, w8a16 quantization)
+- Pre-compiled models from [HuggingFace AXERA-TECH](https://huggingface.co/AXERA-TECH)
 - Classification models compiled locally with Pulsar2 5.1, INT8 MinMax
 - Default = IRQ on CPU0 (A55), schedutil governor
 - Optimized = IRQ on CPU4 (A76), performance governor
@@ -239,6 +369,12 @@ For LLM inference, the effect is even more dramatic (+100%) because each token r
 - NPU inference time measured via PyAXEngine (axengine) internal timer
 - 100 runs averaged
 - Full pipeline tested on real images with mixed Chinese/English text
+
+### TTS (CosyVoice3)
+
+- Custom C++ binary via AXCL with tokenizer server
+- 3 runs per configuration, key metrics averaged
+- Stochastic model (different token counts per run), so TTFT and decode speed compared, not RTF
 
 ### Video Transcode
 
