@@ -8,7 +8,7 @@
 - **PCIe**: Gen2 x1 (500 MB/s)
 - **Driver**: AXCL V3.6.4
 - **Kernel**: 6.1.118
-- **Date**: 2026-02-09 — 2026-02-11
+- **Date**: 2026-02-09 — 2026-02-12
 
 ## LLM Inference — Multi-Model Comparison
 
@@ -359,26 +359,37 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
+| ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
+| ~4.0 ms | QR DEIMv2-femto | +9% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
+| ~10.4 ms | MixFormerV2 (tracking) | +3% |
 | ~11 ms | SigLIP2 vision | +1% |
+| ~13 ms | YOLOv7-Face/DeepLabv3Plus | +2-4% |
+| ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~24 ms | EdgeTAM image encoder | +1% |
-| ~29 ms | OCR detector (det) | +1% |
+| ~28 ms | SuperPoint | +1% |
+| ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
+| ~43 ms | DEIMv2 DINOv3-S | +1% |
 | ~51 ms | MobileSAM encoder | +1% |
+| ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
+| ~383 ms | DeOldify (colorization) | +0.2% |
+| ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
+| ~498 ms | DeOldify artistic | +0.2% |
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
 For LLM inference, the effect is even more dramatic (+50%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
 
-**40+ models tested** across 13 categories confirm this pattern holds universally. For LLM, 4 model sizes from 0.6B to 7B were tested, all showing significant speedup (+19% to +50%).
+**55+ models tested** across 21 categories confirm this pattern holds universally. For LLM, 4 model sizes from 0.6B to 7B were tested, all showing significant speedup (+19% to +50%).
 
 ## Stereo Depth Estimation
 
@@ -471,6 +482,137 @@ Note: EdgeTAM prompt encoder shows 5x PCIe overhead (0.055 vs 0.27ms) — for ex
 ### Analysis
 
 GTCRN at 1.4ms inference time shows +12% speedup — consistent with the optimization pattern for sub-2ms models. Note: GTCRN runs on 1 NPU core (vs 3 cores for most models), making PCIe overhead a larger fraction of total time.
+
+## Object Tracking — MixFormerV2
+
+### Test Configuration
+
+- **Models**: [MixFormerV2](https://huggingface.co/AXERA-TECH/MixFormerV2) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| MixFormerV2 | 10.745 | **10.416** | +3.2% | 96 |
+
+## Face Restoration — CodeFormer
+
+### Test Configuration
+
+- **Models**: [CodeFormer](https://huggingface.co/AXERA-TECH/CodeFormer) pipeline: face detection → restoration → upscale (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Task | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------|------------------:|--------------------:|--------:|
+| YOLOv5l-Face | Face Detection | 29.566 | **28.942** | +2.2% |
+| RealESRGAN-x2 | Face Upscale | 16.168 | **15.843** | +2.1% |
+| CodeFormer | Face Restoration | 444.721 | **444.093** | +0.1% |
+
+### Analysis
+
+The CodeFormer pipeline shows the optimization pattern clearly: the lighter detection (30ms) and upscaling (16ms) components benefit slightly, while the heavy restoration model (445ms) is fully compute-bound.
+
+## Photo Colorization — DeOldify
+
+### Test Configuration
+
+- **Models**: [DeOldify](https://huggingface.co/AXERA-TECH/DeOldify) artistic and stable variants (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Colorize Stable | 383.607 | **382.969** | +0.2% |
+| Colorize Artistic | 498.415 | **497.663** | +0.2% |
+
+### Analysis
+
+Both DeOldify variants are heavily compute-bound (383-498ms), so PCIe optimization has negligible effect (~0.2%).
+
+## Background Removal — RMBG-1.4
+
+### Test Configuration
+
+- **Models**: [RMBG-1.4](https://huggingface.co/AXERA-TECH/RMBG-1.4) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| RMBG-1.4 | 107.205 | **106.514** | +0.6% |
+
+## Semantic Segmentation — DeepLabv3Plus
+
+### Test Configuration
+
+- **Models**: [DeepLabv3Plus](https://huggingface.co/AXERA-TECH/DeepLabv3Plus) with MobileNet backbone (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| DeepLabv3Plus-MobileNet | 13.827 | **13.244** | +4.4% | 76 |
+
+## Keypoint Detection — SuperPoint
+
+### Test Configuration
+
+- **Models**: [SuperPoint](https://huggingface.co/AXERA-TECH/SuperPoint) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| SuperPoint | 28.052 | **27.838** | +0.8% | 36 |
+
+## QR Code Detection
+
+### Test Configuration
+
+- **Models**: [QRCode_det](https://huggingface.co/AXERA-TECH/QRCode_det) — multiple detector architectures trained for QR code detection (pre-compiled for AX650, npu1)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| YOLO26n | 4.083 | **3.634** | +12.4% | 275 |
+| YOLO11n | 4.259 | **3.803** | +12.0% | 263 |
+| DEIMv2-femto | 4.377 | **4.003** | +9.3% | 250 |
+
+### Analysis
+
+QR code detectors are compact nano-sized models (~4ms inference), making them good beneficiaries of PCIe optimization (+9-12%). YOLO26n and YOLO11n show nearly identical speedup.
+
+## Additional Face Detection
+
+### With vs Without Optimization
+
+| Model | Source | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|--------|------------------:|--------------------:|--------:|--------------:|
+| YOLOv7-Face | [AXERA-TECH](https://huggingface.co/AXERA-TECH/YOLOv7-Face) | 12.933 | **12.663** | +2.1% | 79 |
+
+## Additional Detection — DEIMv2
+
+### With vs Without Optimization
+
+| Model | Source | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|--------|------------------:|--------------------:|--------:|--------------:|
+| DEIMv2 DINOv3-S | [AXERA-TECH](https://huggingface.co/AXERA-TECH/DEIMv2) | 43.054 | **42.424** | +1.5% | 24 |
 
 ## Methodology
 

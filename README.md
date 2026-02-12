@@ -129,7 +129,19 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% |
 | IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% |
 
-### Super-Resolution, Segmentation, Zero-Shot, Speech
+### Tracking, Segmentation, Keypoints, QR Detection
+
+| Model | Task | Default (ms) | Optimized (ms) | Speedup | FPS |
+|-------|------|----------:|------------:|--------:|----:|
+| QR YOLO26n | QR detection | 4.08 | **3.63** | +12% | 275 |
+| QR YOLO11n | QR detection | 4.26 | **3.80** | +12% | 263 |
+| MixFormerV2 | Object tracking | 10.75 | **10.42** | +3% | 96 |
+| YOLOv7-Face | Face detection | 12.93 | **12.66** | +2% | 79 |
+| DeepLabv3Plus | Semantic seg | 13.83 | **13.24** | +4% | 76 |
+| SuperPoint | Keypoints | 28.05 | **27.84** | +1% | 36 |
+| DEIMv2 DINOv3-S | Detection | 43.05 | **42.42** | +1% | 24 |
+
+### Super-Resolution, Zero-Shot, Speech, Restoration
 
 | Model | Task | Default (ms) | Optimized (ms) | Speedup |
 |-------|------|----------:|------------:|--------:|
@@ -143,6 +155,9 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | YOLO-World | Detection | 9.71 | **9.25** | +5% |
 | Whisper-tiny enc | Speech-to-text | 21.27 | **21.13** | +1% |
 | Whisper-tiny dec | Speech-to-text | 4.05 | **3.93** | +3% |
+| RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% |
+| CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% |
+| DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% |
 
 ### TTS — CosyVoice3 (Russian text on NPU)
 
@@ -163,16 +178,19 @@ The speedup correlates inversely with inference time — faster models benefit m
 | < 0.5 ms | OCR classifier | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
+| ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
-| ~3.5 ms | ResNet50 | +8% |
-| ~7 ms | YOLOv5s | +5% |
+| ~10 ms | MixFormerV2 | +3% |
+| ~13 ms | DeepLabv3Plus | +4% |
 | ~29 ms | OCR detector | +1% |
+| ~107 ms | RMBG-1.4 | +1% |
 | ~143 ms | IGEV++ stereo depth | ~0% |
-| ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
+| ~445 ms | CodeFormer | +0.1% |
+| ~498 ms | DeOldify artistic | +0.2% |
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**40+ models tested** across 13 categories: LLM (4 model sizes, 0.6B to 7B), vision detection, segmentation, classification, OCR, face recognition, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, and speaker identification.
+**55+ models tested** across 21 categories: LLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
