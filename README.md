@@ -57,20 +57,29 @@ Decode speed (tok/s) via AXCL runtime on CM3588 PCIe Gen2 x1:
 
 | Model | Quant | Default | Optimized | Speedup | Native (official) |
 |-------|-------|--------:|----------:|--------:|-------------------:|
+| MiniCPM4-0.5B | W8A16 | 8.5-9.4 | **15.4-18.4** | +86% | 36 |
+| SmolLM2-360M | W8A16 | 7.0-9.6 | **12.2-14.0** | +63% | 38.7 |
 | Qwen3-0.6B | W8A16 | 7.1-7.5 | **10-12** | +50% | 19-20 |
+| DeepSeek-R1-1.5B | W4A16 | 4.9-6.5 | **10.2-11.0** | +70% | 17.7 |
+| DeepSeek-R1-1.5B | W8A16 | 4.2-5.2 | **7.6-8.3** | +60% | 17.7 |
 | Qwen3-1.7B | W8A16 | 5.1-5.3 | **7.8-8.0** | +50% | 7.42 |
-| Qwen3-4B | W8A16 | 2.6-2.8 | **3.7** | +37% | — |
 | Qwen2.5-7B | W4A16 | 3.7 | **4.4** | +19% | 4.8 |
+| SmolLM3-3B | W8A16 | 2.6-3.2 | **4.3-4.4** | +50% | — |
+| Qwen3-4B | W8A16 | 2.6-2.8 | **3.7** | +37% | — |
 
 TTFT (time to first token):
 
 | Model | Default | Optimized | Speedup |
 |-------|--------:|----------:|--------:|
+| MiniCPM4-0.5B | 318-350 ms | **234-244 ms** | +30% |
+| SmolLM2-360M | 347-373 ms | **285-304 ms** | +20% |
 | Qwen3-0.6B | 488-578 ms | **391 ms** | +25% |
+| DeepSeek-R1-1.5B | 509-661 ms | **380-432 ms** | +35% |
 | Qwen3-1.7B | 541 ms | **447 ms** | +21% |
+| SmolLM3-3B | 916-1043 ms | **708-735 ms** | +30% |
 | Qwen3-4B | 1216 ms | **1110 ms** | +10% |
 
-Qwen3-1.7B optimized reaches **~108% of official native** (7.9 vs 7.42) — likely due to measurement variance, but PCIe overhead is effectively eliminated for compute-bound models. Qwen2.5-7B reaches **92% of native** (4.4 vs 4.8).
+MiniCPM4-0.5B shows the highest optimization gain at **+86%** — its efficient architecture benefits enormously from reduced PCIe latency. DeepSeek-R1-1.5B W4A16 reaches **11 tok/s** with optimization, making reasoning models practical on edge hardware. Qwen3-1.7B optimized reaches **~108% of official native** (7.9 vs 7.42). **9 LLM configurations tested** across 7 model families.
 
 ### Vision Models (NPU inference, 640x640)
 
@@ -190,7 +199,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**55+ models tested** across 21 categories: LLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
+**60+ models tested** across 21 categories: LLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

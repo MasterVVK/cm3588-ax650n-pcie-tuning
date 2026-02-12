@@ -8,7 +8,7 @@
 - **PCIe**: Gen2 x1 (500 MB/s)
 - **Driver**: AXCL V3.6.4
 - **Kernel**: 6.1.118
-- **Date**: 2026-02-09 — 2026-02-12
+- **Date**: 2026-02-09 — 2026-02-13
 
 ## LLM Inference — Multi-Model Comparison
 
@@ -16,27 +16,39 @@
 
 | Model | Quant | Layers | Size | Default | Optimized | Speedup | Native (official) |
 |-------|-------|-------:|-----:|--------:|----------:|--------:|------------------:|
+| MiniCPM4-0.5B | W8A16 | 24 | 1.5 GB | 8.5-9.4 | **15.4-18.4** | +86% | 36 |
+| SmolLM2-360M | W8A16 | 32 | 1.3 GB | 7.0-9.6 | **12.2-14.0** | +63% | 38.7 |
 | Qwen3-0.6B | W8A16 | 28 | 1.0 GB | 7.1-7.5 | **10-12** | +50% | 19-20 |
+| DeepSeek-R1-1.5B | W4A16 | 28 | 2.4 GB | 4.9-6.5 | **10.2-11.0** | +70% | 17.7 |
+| DeepSeek-R1-1.5B | W8A16 | 28 | 3.2 GB | 4.2-5.2 | **7.6-8.3** | +60% | 17.7 |
 | Qwen3-1.7B | W8A16 | 24 | 2.7 GB | 5.1-5.3 | **7.8-8.0** | +50% | 7.42 |
-| Qwen3-4B | W8A16 | 36 | 5.1 GB | 2.6-2.8 | **3.7** | +37% | — |
 | Qwen2.5-7B | W4A16 | 28 | 5.2 GB | 3.7 | **4.4** | +19% | 4.8 |
+| SmolLM3-3B | W8A16 | 36 | 4.6 GB | 2.6-3.2 | **4.3-4.4** | +50% | — |
+| Qwen3-4B | W8A16 | 36 | 5.1 GB | 2.6-2.8 | **3.7** | +37% | — |
 
 ### TTFT (Time To First Token)
 
 | Model | Default | Optimized | Speedup |
 |-------|--------:|----------:|--------:|
+| MiniCPM4-0.5B | 318-350 ms | **234-244 ms** | +30% |
+| SmolLM2-360M | 347-373 ms | **285-304 ms** | +20% |
 | Qwen3-0.6B | 488-578 ms | **391 ms** | +25% |
+| DeepSeek-R1-1.5B | 509-661 ms | **380-432 ms** | +35% |
 | Qwen3-1.7B | 541 ms | **447 ms** | +21% |
+| SmolLM3-3B | 916-1043 ms | **708-735 ms** | +30% |
 | Qwen3-4B | 1216 ms | **1110 ms** | +10% |
 
 *Note: Qwen2.5-7B binary does not log TTFT.*
 
 ### Key Observations
 
-- **Qwen3-1.7B** optimized reaches **~108% of official native** (7.9 vs 7.42 tok/s) — likely measurement variance, but PCIe overhead is effectively eliminated for compute-bound models
+- **MiniCPM4-0.5B** shows the highest optimization gain at **+86%** — its efficient architecture benefits enormously from reduced PCIe latency
+- **DeepSeek-R1-1.5B W4A16** reaches **11 tok/s** with optimization, making reasoning models practical on edge hardware
+- **Qwen3-1.7B** optimized reaches **~108% of official native** (7.9 vs 7.42 tok/s) — PCIe overhead effectively eliminated for compute-bound models
 - **Qwen2.5-7B** optimized reaches **92% of native** (4.4 vs 4.8 tok/s)
-- Optimization effect is strongest for small models (+50% for 0.6B and 1.7B) where PCIe latency dominates
-- Larger models are more compute-bound, so PCIe overhead is proportionally smaller, but optimization still provides +19-37%
+- Optimization effect is strongest for small models (+50-86%) where PCIe latency dominates
+- Larger models are more compute-bound, so PCIe overhead is proportionally smaller, but optimization still provides +19-50%
+- **9 LLM configurations** tested across 7 model families (Qwen3, Qwen2.5, MiniCPM4, SmolLM2, SmolLM3, DeepSeek-R1)
 
 ### Cross-Platform Comparison (Qwen3-0.6B)
 
@@ -46,6 +58,15 @@
 | RPi5 + M.2 HAT | Gen2 x1 | ~13 | — | BCM2712 |
 | **CM3588 (optimized)** | **Gen2 x1** | **10-12** | **391 ms** | **This project** |
 | CM3588 (default) | Gen2 x1 | 7.1-7.5 | 488-578 ms | No optimization |
+
+### Cross-Platform Comparison (SmolLM2-360M)
+
+| Platform | PCIe | tok/s | Notes |
+|----------|------|------:|-------|
+| AX650N native | — | 38.7 | No PCIe overhead |
+| RPi5 + M.2 HAT | Gen2 x1 | 20.8 | BCM2712 (54% of native) |
+| **CM3588 (optimized)** | **Gen2 x1** | **12.2-14.0** | **This project (35% of native)** |
+| CM3588 (default) | Gen2 x1 | 7.0-9.6 | No optimization |
 
 ### Qwen3-0.6B Detailed Results
 
@@ -76,6 +97,112 @@
 | Decode speed (avg) | 7.3 tok/s | 10.9 tok/s | **+49%** |
 | TTFT (avg) | 531 ms | 391 ms | **-26%** |
 | Stability | Moderate variance | Improved | |
+
+### MiniCPM4-0.5B Detailed Results
+
+Native (AX650): 36 tok/s. Binary: main_axcl_aarch64 (same as Qwen3). 24 layers, W8A16, tokens_embed: 73448x1024.
+
+#### Without Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 318 | 9.40 |
+| 2 | 350 | 8.50 |
+| 3 | 333 | 8.50 |
+
+#### With Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 234 | 18.40 |
+| 2 | 244 | 15.40 |
+| 3 | 240 | 16.80 |
+
+**Speedup: +86% decode, +30% TTFT.** Record highest optimization gain of all LLMs tested. Optimized = 47% of native (16.9 vs 36).
+
+### SmolLM2-360M-Instruct Detailed Results
+
+Native (AX650): 38.7 tok/s, RPi5 PCIe: 20.8 tok/s. Binary: main_axcl_aarch64 (unique binary). 32 layers, W8A16, tokens_embed: 49152x960.
+
+#### Without Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 347 | 7.0 |
+| 2 | 373 | 9.1 |
+| 3 | 365 | 9.6 |
+
+#### With Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 304 | 12.2 |
+| 2 | 293 | 13.9 |
+| 3 | 285 | 14.0 |
+
+**Speedup: +63% decode, +20% TTFT.** Optimized = 35% of native (13.4 vs 38.7), 65% of RPi5 (13.4 vs 20.8).
+
+### DeepSeek-R1-Distill-Qwen-1.5B Detailed Results
+
+Native (AX650): 17.68 tok/s. Reasoning model (generates `<think>` block). 28 layers, Qwen2 architecture.
+
+#### W8A16 — Without Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 553 | 5.12 |
+| 2 | 661 | 4.19 |
+| 3 | 541 | 5.15 |
+
+#### W8A16 — With Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 403 | 8.20 |
+| 2 | 432 | 7.60 |
+| 3 | 406 | 8.25 |
+
+**W8A16 Speedup: +60% decode, +35% TTFT.** Optimized = 45% of native (8.0 vs 17.7).
+
+#### W4A16 (GPTQ-Int4) — Without Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 533 | 6.54 |
+| 2 | 509 | 6.43 |
+| 3 | 627 | 4.87 |
+
+#### W4A16 (GPTQ-Int4) — With Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 383 | 10.48 |
+| 2 | 380 | 11.02 |
+| 3 | 394 | 10.20 |
+
+**W4A16 Speedup: +70% decode, +35% TTFT.** Optimized = 60% of native (10.6 vs 17.7). INT4 quantization is 32% faster than W8A16 with optimization.
+
+### SmolLM3-3B Detailed Results
+
+HuggingFace SmolLM3-3B. Binary: SmolLM2 main_axcl_aarch64 (compatible). 36 layers, W8A16, tokens_embed: 128256x2048. Embedding converted from .npy to .bfloat16.bin. Thinking disabled via tokenizer (enable_thinking=False).
+
+#### Without Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 1043 | 2.64 |
+| 2 | 916 | 3.18 |
+| 3 | 981 | 2.60 |
+
+#### With Optimization
+
+| Run | TTFT (ms) | Decode (tok/s) |
+|-----|-----------|----------------|
+| 1 | 735 | 4.30 |
+| 2 | 708 | 4.34 |
+| 3 | 726 | 4.38 |
+
+**Speedup: +50% decode, +30% TTFT.** Similar to Qwen3-4B in both absolute speed and optimization gain, consistent with 3B+ parameter models being compute-bound.
 
 ## MaxReadReq Experiments
 
@@ -128,7 +255,7 @@ These experiments were conducted to test whether PCIe register tuning could impr
 
 ### Analysis
 
-The optimization effect on vision models (2-13%) is smaller than on LLM (+100%) because:
+The optimization effect on vision models (2-13%) is smaller than on LLM (+50-86%) because:
 
 1. **LLM decode** = hundreds of sequential small NPU calls + PCIe transfers. Each IRQ routing delay and frequency drop compounds across tokens.
 2. **Vision inference** = single large NPU computation. The PCIe transfer overhead is a smaller fraction of total time.
@@ -387,9 +514,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
-For LLM inference, the effect is even more dramatic (+50%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
+For LLM inference, the effect is even more dramatic (+50-86%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains.
 
-**55+ models tested** across 21 categories confirm this pattern holds universally. For LLM, 4 model sizes from 0.6B to 7B were tested, all showing significant speedup (+19% to +50%).
+**60+ models tested** across 21 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +86%).
 
 ## Stereo Depth Estimation
 
