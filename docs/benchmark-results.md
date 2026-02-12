@@ -314,6 +314,33 @@ These experiments were conducted to test whether PCIe register tuning could impr
 | YOLOv8s-Pose | Pose | 11.812 | **11.259** | +4.7% | 89 |
 | Depth-Anything-V2-S | Depth | 33.994 | **33.443** | +1.6% | 30 |
 
+### YOLO26-Pose (NPU 3-core, 640x640)
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS | Native (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|------------:|
+| YOLO26n-Pose | 2.083 | **1.708** | +22.0% | 586 | 1.525 |
+| YOLO26s-Pose | 4.071 | **3.717** | +9.5% | 269 | 3.528 |
+| YOLO26m-Pose | 10.252 | **9.621** | +6.6% | 104 | 9.296 |
+| YOLO26l-Pose | 12.899 | **12.159** | +6.1% | 82 | — |
+| YOLO26x-Pose | 26.377 | **25.709** | +2.6% | 39 | — |
+
+### YOLO26-Seg (NPU 3-core, 640x640)
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| YOLO26n-Seg | 2.861 | **2.337** | +22.4% | 428 |
+| YOLO26s-Seg | 5.614 | **5.035** | +11.5% | 199 |
+| YOLO26m-Seg | 15.260 | **14.648** | +4.2% | 68 |
+| YOLO26l-Seg | 17.563 | **17.270** | +1.7% | 58 |
+| YOLO26x-Seg | 38.058 | **37.334** | +1.9% | 27 |
+
+### Depth-Anything-3 (NPU 3-core)
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------------------:|--------------------:|--------:|------------:|
+| DA3-small | 24.019 | **23.278** | +3.2% | 22.77 |
+| DA3-base | 68.512 | **67.713** | +1.2% | 67.34 |
+
 ### Latency Stability (p95 - min)
 
 | Model | Default (us) | Optimized (us) | Improvement |
@@ -521,6 +548,41 @@ Real-ESRGAN shows minimal optimization benefit — the models are compute-heavy 
 | Encoder | 21.268 | **21.132** | +0.6% |
 | Decoder | 4.054 | **3.932** | +3.1% |
 
+## Speech Recognition — SenseVoice
+
+### Test Configuration
+
+- **Models**: [SenseVoice](https://huggingface.co/AXERA-TECH/SenseVoice) (FunASR, supports zh/en/ja/ko/yue + emotion)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| SenseVoice (full) | 55.328 | **54.691** | +1.2% |
+| SenseVoice (streaming) | 13.105 | **12.369** | +6.0% |
+
+### Analysis
+
+The streaming variant (13ms) benefits more from optimization (+6%) than the full model (55ms, +1%) — consistent with the inference-time pattern. SenseVoice is a 250MB model supporting 5 languages with emotion recognition.
+
+## CLIP — MobileCLIP2
+
+### Test Configuration
+
+- **Models**: [MobileCLIP2](https://huggingface.co/AXERA-TECH/MobileCLIP) S0 and S4 (Apple, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (S0), 20 iterations (S4 image), 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| S0 Image (256x256) | 8.626 | **8.485** | +1.7% | — |
+| S4 Image (384x384) | 64.942 | **64.339** | +0.9% | 65.33 |
+| S4 Text | 13.081 | **12.895** | +1.4% | 12.66 |
+
 ## TTS — CosyVoice3
 
 ### Test Configuration
@@ -561,28 +623,41 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
 | ~1.6 ms | SmolVLM2-256M LLM post | +21% |
+| ~1.7 ms | YOLO26n-Pose | **+22%** |
+| ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
-| ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
+| ~5.0 ms | YOLO26s-Seg | +12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
+| ~8.5 ms | MobileCLIP2-S0 image | +2% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
+| ~9.6 ms | YOLO26m-Pose | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
 | ~11 ms | SigLIP2 vision | +1% |
-| ~13 ms | YOLOv7-Face/DeepLabv3Plus | +2-4% |
+| ~12.2 ms | YOLO26l-Pose | +6% |
+| ~12.4 ms | SenseVoice streaming | +6% |
+| ~13 ms | YOLOv7-Face/DeepLabv3Plus/MobileCLIP2-S4 text | +1-4% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
+| ~23 ms | Depth-Anything-3 small | +3% |
 | ~24 ms | EdgeTAM image encoder | +1% |
+| ~26 ms | YOLO26x-Pose | +3% |
 | ~28 ms | SuperPoint | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
 | ~43 ms | DEIMv2 DINOv3-S | +1% |
+| ~37 ms | YOLO26x-Seg | +2% |
 | ~45 ms | FastVLM-0.5B vision encoder | +2% |
 | ~51 ms | MobileSAM encoder | +1% |
+| ~55 ms | SenseVoice (full) | +1% |
+| ~65 ms | MobileCLIP2-S4 image | +1% |
+| ~68 ms | Depth-Anything-3 base | +1% |
 | ~99 ms | SmolVLM2-256M vision encoder | +1% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
@@ -596,7 +671,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-45% improvement — consistent with the LLM pattern.
 
-**70+ models tested** across 22 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
+**90+ models tested** across 25 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
 
 ## Stereo Depth Estimation
 

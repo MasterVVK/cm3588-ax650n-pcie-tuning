@@ -94,7 +94,27 @@ MiniCPM4-0.5B and SmolLM2-360M show the highest optimization gains at **+75-100%
 | YOLOv8s-Pose | 11.81 | **11.26** | +5% | 89 |
 | Depth-Anything-V2-S | 34.00 | **33.44** | +2% | 30 |
 
-Key effect on vision: **2-13% faster + 2-3x more stable** latency (critical for real-time pipelines).
+### YOLO26 Pose Estimation & Segmentation (NPU 3-core, 640x640)
+
+| Model | Default (ms) | Optimized (ms) | Speedup | FPS |
+|-------|----------:|------------:|--------:|----:|
+| YOLO26n-Pose | 2.08 | **1.71** | **+22%** | 586 |
+| YOLO26n-Seg | 2.86 | **2.34** | **+22%** | 428 |
+| YOLO26s-Pose | 4.07 | **3.72** | +10% | 269 |
+| YOLO26s-Seg | 5.61 | **5.04** | +12% | 199 |
+| YOLO26m-Pose | 10.25 | **9.62** | +7% | 104 |
+| YOLO26x-Pose | 26.38 | **25.71** | +3% | 39 |
+
+YOLO26 nano models show **+22% speedup** — among the highest for vision models. Full n/s/m/l/x results in [benchmark details](docs/benchmark-results.md).
+
+### Depth-Anything-3
+
+| Model | Default (ms) | Optimized (ms) | Speedup |
+|-------|----------:|------------:|--------:|
+| DA3-small | 24.02 | **23.28** | +3% |
+| DA3-base | 68.51 | **67.71** | +1% |
+
+Key effect on vision: **2-22% faster + 2-3x more stable** latency (critical for real-time pipelines).
 
 ### Classification (NPU inference, 224x224)
 
@@ -164,6 +184,10 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | YOLO-World | Detection | 9.71 | **9.25** | +5% |
 | Whisper-tiny enc | Speech-to-text | 21.27 | **21.13** | +1% |
 | Whisper-tiny dec | Speech-to-text | 4.05 | **3.93** | +3% |
+| SenseVoice stream | ASR (5 langs) | 13.11 | **12.37** | +6% |
+| SenseVoice full | ASR (5 langs) | 55.33 | **54.69** | +1% |
+| MobileCLIP2-S0 | CLIP image | 8.63 | **8.49** | +2% |
+| MobileCLIP2-S4 | CLIP image | 64.94 | **64.34** | +1% |
 | RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% |
 | CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% |
 | DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% |
@@ -214,7 +238,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**70+ models tested** across 22 categories: LLM, VLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
+**90+ models tested** across 25 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
