@@ -2,11 +2,11 @@
 
 **[Русский](README.ru.md)** | **[中文](README.zh.md)**
 
-> Double the LLM inference speed of [M5Stack Module LLM (AI-8850)](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) on [FriendlyElec CM3588 NAS](https://wiki.friendlyelec.com/wiki/index.php/CM3588).
+> Boost LLM inference speed of [M5Stack Module LLM (AI-8850)](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) by up to +50% on [FriendlyElec CM3588 NAS](https://wiki.friendlyelec.com/wiki/index.php/CM3588).
 
 ## Problem
 
-The AX650N NPU (24 TOPS INT8) connected via M.2 on CM3588 NAS delivers only **5-7 tok/s** for LLM inference instead of the expected 12-13 tok/s. The root causes:
+The AX650N NPU (24 TOPS INT8) connected via M.2 on CM3588 NAS delivers only **7-7.5 tok/s** for LLM inference (Qwen3-0.6B) instead of the expected 12-13 tok/s. The root causes:
 
 1. **PCIe Gen2 x1 hardware limitation** — CM3588 routes only 1 lane to the M.2 slot (device supports x2)
 2. **IRQ on little core** — all interrupts handled by slow Cortex-A55 @ 1.8 GHz
@@ -14,12 +14,12 @@ The AX650N NPU (24 TOPS INT8) connected via M.2 on CM3588 NAS delivers only **5-
 
 ## Solution
 
-This toolkit applies two optimizations that together provide **+100% improvement**:
+This toolkit applies two optimizations that together provide **+50% improvement** (Qwen3-0.6B):
 
 | | Before | After |
 |--|--------|-------|
-| Decode speed | 5-7.5 tok/s | **11-12.6 tok/s** |
-| TTFT (prefill) | 440-616 ms | **353-397 ms** |
+| Decode speed | 7.1-7.5 tok/s | **10-12 tok/s** |
+| TTFT (prefill) | 488-578 ms | **391 ms** |
 | Stability | High variance | Consistent |
 
 ## Quick Start
@@ -53,14 +53,24 @@ Output includes: PCIe topology, link speed/width, MaxPayload, IRQ affinity, CPU 
 
 ### LLM Inference
 
-Model: Qwen3-0.6B (W8A16) via AXCL runtime
+Decode speed (tok/s) via AXCL runtime on CM3588 PCIe Gen2 x1:
 
-| Platform | PCIe | tok/s |
-|----------|------|-------|
-| AX650N native | — | 19-20 |
-| Raspberry Pi 5 | Gen2 x1 | ~13 |
-| **CM3588 (optimized)** | **Gen2 x1** | **12.0** |
-| CM3588 (default) | Gen2 x1 | 5-7 |
+| Model | Quant | Default | Optimized | Speedup | Native (official) |
+|-------|-------|--------:|----------:|--------:|-------------------:|
+| Qwen3-0.6B | W8A16 | 7.1-7.5 | **10-12** | +50% | 19-20 |
+| Qwen3-1.7B | W8A16 | 5.1-5.3 | **7.8-8.0** | +50% | 7.42 |
+| Qwen3-4B | W8A16 | 2.6-2.8 | **3.7** | +37% | — |
+| Qwen2.5-7B | W4A16 | 3.7 | **4.4** | +19% | 4.8 |
+
+TTFT (time to first token):
+
+| Model | Default | Optimized | Speedup |
+|-------|--------:|----------:|--------:|
+| Qwen3-0.6B | 488-578 ms | **391 ms** | +25% |
+| Qwen3-1.7B | 541 ms | **447 ms** | +21% |
+| Qwen3-4B | 1216 ms | **1110 ms** | +10% |
+
+Qwen3-1.7B optimized reaches **~108% of official native** (7.9 vs 7.42) — likely due to measurement variance, but PCIe overhead is effectively eliminated for compute-bound models. Qwen2.5-7B reaches **92% of native** (4.4 vs 4.8).
 
 ### Vision Models (NPU inference, 640x640)
 
@@ -145,7 +155,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**30+ models tested** across 10 categories: LLM, vision detection, segmentation, classification, OCR, face recognition, super-resolution, zero-shot, speech recognition, and TTS.
+**30+ models tested** across 10 categories: LLM (4 model sizes, 0.6B to 7B), vision detection, segmentation, classification, OCR, face recognition, super-resolution, zero-shot, speech recognition, and TTS.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
@@ -171,7 +181,7 @@ While the PCIe width cannot be changed (hardware limitation), the software-side 
 - **IRQ routing**: Linux defaults to CPU0 (A55 @ 1.8 GHz) for MSI interrupts. Moving to CPU4 (A76 @ 2.3 GHz) reduces interrupt handling latency by ~30%.
 - **CPU governor**: The `schedutil` governor aggressively scales down frequency during idle periods between token generations. `performance` governor maintains peak frequency.
 
-Combined effect: **+100% decode throughput, +20% prefill speed**.
+Combined effect: **+50% decode throughput, +25% prefill speed** (Qwen3-0.6B). Up to +50% on Qwen3-1.7B, +37% on Qwen3-4B.
 
 See [PCIe Architecture Analysis](docs/pcie-analysis.md) for the full technical deep-dive.
 
