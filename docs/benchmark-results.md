@@ -662,6 +662,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
+| ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
@@ -764,6 +765,26 @@ Note: EdgeTAM prompt encoder shows 5x PCIe overhead (0.055 vs 0.27ms) — for ex
 ### Analysis
 
 GTCRN at 1.4ms inference time shows +12% speedup — consistent with the optimization pattern for sub-2ms models. Note: GTCRN runs on 1 NPU core (vs 3 cores for most models), making PCIe overhead a larger fraction of total time.
+
+## Video Frame Interpolation — RIFE
+
+### Test Configuration
+
+- **Models**: [RIFE.axera](https://huggingface.co/AXERA-TECH/RIFE.axera) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| RIFE x2 720p | 210.522 | **209.761** | +0.4% |
+| RIFE x2 1080p | — | — | CMM overflow |
+| RIFE x2 4K | — | — | CMM overflow |
+
+### Analysis
+
+RIFE 720p at 210ms is compute-bound — optimization has negligible effect. The 1080p model (493 MB CMM) and 4K model (2.4 GB CMM) fail to load via PCIe due to CMM memory constraints. At ~5 FPS (720p), RIFE is not real-time on AX650N.
 
 ## Object Tracking — MixFormerV2
 
