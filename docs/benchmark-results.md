@@ -230,6 +230,54 @@ HuggingFace SmolLM3-3B. Binary: SmolLM2 main_axcl_aarch64 (compatible). 36 layer
 
 **Speedup: +50% decode, +30% TTFT.** Similar to Qwen3-4B in both absolute speed and optimization gain, consistent with 3B+ parameter models being compute-bound.
 
+## VLM (Vision-Language Model) Component Benchmarks
+
+### Test Configuration
+
+- **Models**: [SmolVLM2-256M-Video-Instruct](https://huggingface.co/AXERA-TECH/SmolVLM2-256M-Video-Instruct_Ax650) and [FastVLM-0.5B](https://huggingface.co/AXERA-TECH/FastVLM-0.5B) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model` (individual .axmodel components via PCIe)
+- **Repeats**: 100 iterations, 5 warmup
+- **Note**: No AXCL aarch64 binary available for end-to-end VLM inference. Only native (`main_ax650`) and AXCL x86 (`main_axcl_x86`) binaries exist. Component benchmarks show optimization effect on each VLM stage.
+
+### SmolVLM2-256M-Video-Instruct
+
+Native (AX650): 76.7 tok/s (image), 75.5 tok/s (video). 30 LLM layers, W8A16.
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision Encoder (512x512) | 99.115 | **98.352** | +0.8% |
+| LLM Decoder Layer | 0.818 | **0.566** | +44.5% |
+| LLM Post | 1.980 | **1.639** | +20.8% |
+
+Estimated decode speed (30 layers + post):
+- Default: ~38 tok/s (30×0.818 + 1.980 ≈ 26.5 ms/tok)
+- Optimized: ~54 tok/s (30×0.566 + 1.639 ≈ 18.6 ms/tok)
+- Native: 76.7 tok/s
+
+### FastVLM-0.5B
+
+Native (AX650): 34.8 tok/s. 24 LLM layers, W4A16 (Qwen2 architecture).
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision Encoder (512x512) | 45.507 | **44.642** | +1.9% |
+| LLM Decoder Layer | 1.547 | **1.170** | +32.2% |
+| LLM Post | 7.538 | **7.043** | +7.0% |
+
+Estimated decode speed (24 layers + post):
+- Default: ~22 tok/s (24×1.547 + 7.538 ≈ 44.7 ms/tok)
+- Optimized: ~29 tok/s (24×1.170 + 7.043 ≈ 35.1 ms/tok)
+- Native: 34.8 tok/s
+
+### Analysis
+
+VLM components follow the exact same optimization pattern as other models:
+- **Vision encoders** (45-99ms): +1-2% — compute-bound, minimal PCIe overhead
+- **LLM decoder layers** (0.6-1.5ms): **+32-45%** — PCIe latency dominant, huge optimization benefit
+- **LLM post** (1.6-7.5ms): +7-21% — moderate benefit
+
+The LLM decoder layers are called once per token and dominate decode speed. Optimization makes the biggest difference here, consistent with standalone LLM results. Estimated end-to-end decode speedup: +28-42%.
+
 ## MaxReadReq Experiments
 
 These experiments were conducted to test whether PCIe register tuning could improve performance.
@@ -281,7 +329,7 @@ These experiments were conducted to test whether PCIe register tuning could impr
 
 ### Analysis
 
-The optimization effect on vision models (2-13%) is smaller than on LLM (+50-86%) because:
+The optimization effect on vision models (2-13%) is smaller than on LLM (+50-100%) because:
 
 1. **LLM decode** = hundreds of sequential small NPU calls + PCIe transfers. Each IRQ routing delay and frequency drop compounds across tokens.
 2. **Vision inference** = single large NPU computation. The PCIe transfer overhead is a smaller fraction of total time.
@@ -506,10 +554,13 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | < 0.5 ms | OCR classifier (cls) | **+71%** |
+| ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
+| ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
+| ~1.6 ms | SmolVLM2-256M LLM post | +21% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
@@ -518,6 +569,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~4.0 ms | QR DEIMv2-femto | +9% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
+| ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
@@ -529,7 +581,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~28 ms | SuperPoint | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
 | ~43 ms | DEIMv2 DINOv3-S | +1% |
+| ~45 ms | FastVLM-0.5B vision encoder | +2% |
 | ~51 ms | MobileSAM encoder | +1% |
+| ~99 ms | SmolVLM2-256M vision encoder | +1% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
@@ -540,9 +594,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
-For LLM inference, the effect is even more dramatic (+50-86%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains.
+For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-45% improvement — consistent with the LLM pattern.
 
-**60+ models tested** across 21 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +86%).
+**70+ models tested** across 22 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
 
 ## Stereo Depth Estimation
 

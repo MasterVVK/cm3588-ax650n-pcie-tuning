@@ -176,6 +176,21 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | LLM Decode | 13.9 tok/s | **16.3 tok/s** | +17% |
 | RTF (Real-Time Factor) | 2.0-3.7x | **1.7-1.9x** | |
 
+### VLM — SmolVLM2-256M & FastVLM-0.5B (Component Benchmarks)
+
+No AXCL aarch64 binary for end-to-end VLM; individual .axmodel components benchmarked via `axcl_run_model`:
+
+| Model | Component | Default (ms) | Optimized (ms) | Speedup |
+|-------|-----------|----------:|------------:|--------:|
+| SmolVLM2-256M | Vision Encoder | 99.12 | **98.35** | +1% |
+| SmolVLM2-256M | LLM Layer | 0.818 | **0.566** | **+45%** |
+| SmolVLM2-256M | LLM Post | 1.980 | **1.639** | +21% |
+| FastVLM-0.5B | Vision Encoder | 45.51 | **44.64** | +2% |
+| FastVLM-0.5B | LLM Layer | 1.547 | **1.170** | **+32%** |
+| FastVLM-0.5B | LLM Post | 7.538 | **7.043** | +7% |
+
+VLM decoder layers show +32-45% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%), FastVLM ~22→29 tok/s (+28%).
+
 ### Optimization Effect Pattern
 
 The speedup correlates inversely with inference time — faster models benefit more:
@@ -199,7 +214,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**60+ models tested** across 21 categories: LLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
+**70+ models tested** across 22 categories: LLM, VLM, vision detection, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
