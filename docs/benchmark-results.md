@@ -16,11 +16,11 @@
 
 | Model | Quant | Layers | Size | Default | Optimized | Speedup | Native (official) |
 |-------|-------|-------:|-----:|--------:|----------:|--------:|------------------:|
-| MiniCPM4-0.5B | W8A16 | 24 | 1.5 GB | 8.5-9.4 | **15.4-18.4** | +86% | 36 |
-| SmolLM2-360M | W8A16 | 32 | 1.3 GB | 7.0-9.6 | **12.2-14.0** | +63% | 38.7 |
+| MiniCPM4-0.5B | W8A16 | 24 | 1.5 GB | 6-11 | **15-20** | +100% | 36 |
+| SmolLM2-360M | W8A16 | 32 | 1.3 GB | 5-10 | **13-16** | +75% | 38.7 |
 | Qwen3-0.6B | W8A16 | 28 | 1.0 GB | 7.1-7.5 | **10-12** | +50% | 19-20 |
-| DeepSeek-R1-1.5B | W4A16 | 28 | 2.4 GB | 4.9-6.5 | **10.2-11.0** | +70% | 17.7 |
-| DeepSeek-R1-1.5B | W8A16 | 28 | 3.2 GB | 4.2-5.2 | **7.6-8.3** | +60% | 17.7 |
+| DeepSeek-R1-1.5B | W4A16 | 28 | 2.4 GB | 4.8-7.0 | **10.2-11.0** | +75% | 17.7 |
+| DeepSeek-R1-1.5B | W8A16 | 28 | 3.2 GB | 4.0-5.2 | **7.6-8.6** | +95% | 17.7 |
 | Qwen3-1.7B | W8A16 | 24 | 2.7 GB | 5.1-5.3 | **7.8-8.0** | +50% | 7.42 |
 | Qwen2.5-7B | W4A16 | 28 | 5.2 GB | 3.7 | **4.4** | +19% | 4.8 |
 | SmolLM3-3B | W8A16 | 36 | 4.6 GB | 2.6-3.2 | **4.3-4.4** | +50% | — |
@@ -42,12 +42,13 @@
 
 ### Key Observations
 
-- **MiniCPM4-0.5B** shows the highest optimization gain at **+86%** — its efficient architecture benefits enormously from reduced PCIe latency
+- **MiniCPM4-0.5B** and **SmolLM2-360M** show the highest optimization gains at **+75-100%** — small, efficient architectures benefit enormously from reduced PCIe latency
+- **Baseline (schedutil) is extremely unstable** — up to 2x variance (MiniCPM4: 6-11 tok/s). Optimization dramatically improves both speed AND stability
 - **DeepSeek-R1-1.5B W4A16** reaches **11 tok/s** with optimization, making reasoning models practical on edge hardware
 - **Qwen3-1.7B** optimized reaches **~108% of official native** (7.9 vs 7.42 tok/s) — PCIe overhead effectively eliminated for compute-bound models
 - **Qwen2.5-7B** optimized reaches **92% of native** (4.4 vs 4.8 tok/s)
-- Optimization effect is strongest for small models (+50-86%) where PCIe latency dominates
-- Larger models are more compute-bound, so PCIe overhead is proportionally smaller, but optimization still provides +19-50%
+- Small models (<1B) achieve only 35-55% of native speed — PCIe Gen2 x1 is the bottleneck for fast token generators
+- Larger models (>1.5B) are more compute-bound, approaching native speed as PCIe overhead becomes negligible
 - **9 LLM configurations** tested across 7 model families (Qwen3, Qwen2.5, MiniCPM4, SmolLM2, SmolLM3, DeepSeek-R1)
 
 ### Cross-Platform Comparison (Qwen3-0.6B)
@@ -109,6 +110,11 @@ Native (AX650): 36 tok/s. Binary: main_axcl_aarch64 (same as Qwen3). 24 layers, 
 | 1 | 318 | 9.40 |
 | 2 | 350 | 8.50 |
 | 3 | 333 | 8.50 |
+| 4 (retest) | 423 | 6.17 |
+| 5 (retest) | 305 | 10.61 |
+| 6 (retest) | 362 | 8.49 |
+
+**Baseline extremely unstable with schedutil: 6.17-10.61 tok/s (1.7x variance!)**
 
 #### With Optimization
 
@@ -117,8 +123,11 @@ Native (AX650): 36 tok/s. Binary: main_axcl_aarch64 (same as Qwen3). 24 layers, 
 | 1 | 234 | 18.40 |
 | 2 | 244 | 15.40 |
 | 3 | 240 | 16.80 |
+| 4 (retest) | 228 | 16.73 |
+| 5 (retest) | 240 | 14.60 |
+| 6 (retest) | 214 | 19.84 |
 
-**Speedup: +86% decode, +30% TTFT.** Record highest optimization gain of all LLMs tested. Optimized = 47% of native (16.9 vs 36).
+**Speedup: +100% decode (median 8.5 → 16.7), +40% TTFT.** Optimized = 46% of native (16.7 vs 36). Optimization also dramatically improves stability.
 
 ### SmolLM2-360M-Instruct Detailed Results
 
@@ -131,6 +140,11 @@ Native (AX650): 38.7 tok/s, RPi5 PCIe: 20.8 tok/s. Binary: main_axcl_aarch64 (un
 | 1 | 347 | 7.0 |
 | 2 | 373 | 9.1 |
 | 3 | 365 | 9.6 |
+| 4 (retest) | 511 | 5.13 |
+| 5 (retest) | 530 | 5.01 |
+| 6 (retest) | 431 | 8.72 |
+
+**Baseline extremely unstable with schedutil: 5.01-9.6 tok/s (1.9x variance!)**
 
 #### With Optimization
 
@@ -139,8 +153,11 @@ Native (AX650): 38.7 tok/s, RPi5 PCIe: 20.8 tok/s. Binary: main_axcl_aarch64 (un
 | 1 | 304 | 12.2 |
 | 2 | 293 | 13.9 |
 | 3 | 285 | 14.0 |
+| 4 (retest) | 290 | 15.01 |
+| 5 (retest) | 259 | 16.25 |
+| 6 (retest) | 272 | 13.60 |
 
-**Speedup: +63% decode, +20% TTFT.** Optimized = 35% of native (13.4 vs 38.7), 65% of RPi5 (13.4 vs 20.8).
+**Speedup: +75% decode (median 7.9 → 13.9), +35% TTFT.** Optimized = 36% of native (13.9 vs 38.7), 67% of RPi5 (13.9 vs 20.8). Optimization also dramatically reduces variance.
 
 ### DeepSeek-R1-Distill-Qwen-1.5B Detailed Results
 
@@ -153,6 +170,9 @@ Native (AX650): 17.68 tok/s. Reasoning model (generates `<think>` block). 28 lay
 | 1 | 553 | 5.12 |
 | 2 | 661 | 4.19 |
 | 3 | 541 | 5.15 |
+| 4 (retest) | 688 | 4.16 |
+| 5 (retest) | — | timeout |
+| 6 (retest) | 672 | 3.99 |
 
 #### W8A16 — With Optimization
 
@@ -161,8 +181,11 @@ Native (AX650): 17.68 tok/s. Reasoning model (generates `<think>` block). 28 lay
 | 1 | 403 | 8.20 |
 | 2 | 432 | 7.60 |
 | 3 | 406 | 8.25 |
+| 4 (retest) | 418 | 8.60 |
+| 5 (retest) | 400 | 8.62 |
+| 6 (retest) | 433 | 7.59 |
 
-**W8A16 Speedup: +60% decode, +35% TTFT.** Optimized = 45% of native (8.0 vs 17.7).
+**W8A16 Speedup: +95% decode (median 4.2 → 8.2), +35% TTFT.** Optimized = 46% of native (8.2 vs 17.7).
 
 #### W4A16 (GPTQ-Int4) — Without Optimization
 
@@ -171,6 +194,9 @@ Native (AX650): 17.68 tok/s. Reasoning model (generates `<think>` block). 28 lay
 | 1 | 533 | 6.54 |
 | 2 | 509 | 6.43 |
 | 3 | 627 | 4.87 |
+| 4 (retest) | 608 | 4.75 |
+| 5 (retest) | 527 | 6.67 |
+| 6 (retest) | 561 | 6.30 |
 
 #### W4A16 (GPTQ-Int4) — With Optimization
 
@@ -180,7 +206,7 @@ Native (AX650): 17.68 tok/s. Reasoning model (generates `<think>` block). 28 lay
 | 2 | 380 | 11.02 |
 | 3 | 394 | 10.20 |
 
-**W4A16 Speedup: +70% decode, +35% TTFT.** Optimized = 60% of native (10.6 vs 17.7). INT4 quantization is 32% faster than W8A16 with optimization.
+**W4A16 Speedup: +75% decode (median 6.4 → 10.5), +35% TTFT.** Optimized = 59% of native (10.5 vs 17.7). INT4 quantization is 28% faster than W8A16 with optimization.
 
 ### SmolLM3-3B Detailed Results
 

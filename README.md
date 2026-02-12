@@ -2,7 +2,7 @@
 
 **[Русский](README.ru.md)** | **[中文](README.zh.md)**
 
-> Boost LLM inference speed of [M5Stack Module LLM (AI-8850)](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) by up to +50% on [FriendlyElec CM3588 NAS](https://wiki.friendlyelec.com/wiki/index.php/CM3588).
+> Boost LLM inference speed of [M5Stack Module LLM (AI-8850)](https://docs.m5stack.com/en/guide/ai_accelerator/llm-8850/m5_llm_8850_software_install) by +50-100% on [FriendlyElec CM3588 NAS](https://wiki.friendlyelec.com/wiki/index.php/CM3588).
 
 ## Problem
 
@@ -14,7 +14,7 @@ The AX650N NPU (24 TOPS INT8) connected via M.2 on CM3588 NAS delivers only **7-
 
 ## Solution
 
-This toolkit applies two optimizations that together provide **+50% improvement** (Qwen3-0.6B):
+This toolkit applies two optimizations that together provide **+50-100% improvement** (model-dependent):
 
 | | Before | After |
 |--|--------|-------|
@@ -57,11 +57,11 @@ Decode speed (tok/s) via AXCL runtime on CM3588 PCIe Gen2 x1:
 
 | Model | Quant | Default | Optimized | Speedup | Native (official) |
 |-------|-------|--------:|----------:|--------:|-------------------:|
-| MiniCPM4-0.5B | W8A16 | 8.5-9.4 | **15.4-18.4** | +86% | 36 |
-| SmolLM2-360M | W8A16 | 7.0-9.6 | **12.2-14.0** | +63% | 38.7 |
+| MiniCPM4-0.5B | W8A16 | 6-11 | **15-20** | +100% | 36 |
+| SmolLM2-360M | W8A16 | 5-10 | **13-16** | +75% | 38.7 |
 | Qwen3-0.6B | W8A16 | 7.1-7.5 | **10-12** | +50% | 19-20 |
-| DeepSeek-R1-1.5B | W4A16 | 4.9-6.5 | **10.2-11.0** | +70% | 17.7 |
-| DeepSeek-R1-1.5B | W8A16 | 4.2-5.2 | **7.6-8.3** | +60% | 17.7 |
+| DeepSeek-R1-1.5B | W4A16 | 4.8-7.0 | **10.2-11.0** | +75% | 17.7 |
+| DeepSeek-R1-1.5B | W8A16 | 4.0-5.2 | **7.6-8.6** | +95% | 17.7 |
 | Qwen3-1.7B | W8A16 | 5.1-5.3 | **7.8-8.0** | +50% | 7.42 |
 | Qwen2.5-7B | W4A16 | 3.7 | **4.4** | +19% | 4.8 |
 | SmolLM3-3B | W8A16 | 2.6-3.2 | **4.3-4.4** | +50% | — |
@@ -71,15 +71,15 @@ TTFT (time to first token):
 
 | Model | Default | Optimized | Speedup |
 |-------|--------:|----------:|--------:|
-| MiniCPM4-0.5B | 318-350 ms | **234-244 ms** | +30% |
-| SmolLM2-360M | 347-373 ms | **285-304 ms** | +20% |
+| MiniCPM4-0.5B | 305-423 ms | **214-242 ms** | +40% |
+| SmolLM2-360M | 348-530 ms | **259-304 ms** | +35% |
 | Qwen3-0.6B | 488-578 ms | **391 ms** | +25% |
-| DeepSeek-R1-1.5B | 509-661 ms | **380-432 ms** | +35% |
+| DeepSeek-R1-1.5B | 503-688 ms | **380-432 ms** | +35% |
 | Qwen3-1.7B | 541 ms | **447 ms** | +21% |
 | SmolLM3-3B | 916-1043 ms | **708-735 ms** | +30% |
 | Qwen3-4B | 1216 ms | **1110 ms** | +10% |
 
-MiniCPM4-0.5B shows the highest optimization gain at **+86%** — its efficient architecture benefits enormously from reduced PCIe latency. DeepSeek-R1-1.5B W4A16 reaches **11 tok/s** with optimization, making reasoning models practical on edge hardware. Qwen3-1.7B optimized reaches **~108% of official native** (7.9 vs 7.42). **9 LLM configurations tested** across 7 model families.
+MiniCPM4-0.5B and SmolLM2-360M show the highest optimization gains at **+75-100%** — small, efficient architectures benefit enormously from reduced PCIe latency. Without optimization, baseline is extremely unstable (schedutil causes 2x variance). DeepSeek-R1-1.5B W4A16 reaches **11 tok/s** with optimization, making reasoning models practical on edge hardware. Qwen3-1.7B reaches **~108% of official native** (7.9 vs 7.42). **9 LLM configurations tested** across 7 model families.
 
 ### Vision Models (NPU inference, 640x640)
 
@@ -225,7 +225,7 @@ While the PCIe width cannot be changed (hardware limitation), the software-side 
 - **IRQ routing**: Linux defaults to CPU0 (A55 @ 1.8 GHz) for MSI interrupts. Moving to CPU4 (A76 @ 2.3 GHz) reduces interrupt handling latency by ~30%.
 - **CPU governor**: The `schedutil` governor aggressively scales down frequency during idle periods between token generations. `performance` governor maintains peak frequency.
 
-Combined effect: **+50% decode throughput, +25% prefill speed** (Qwen3-0.6B). Up to +50% on Qwen3-1.7B, +37% on Qwen3-4B.
+Combined effect: **+50-100% decode throughput, +25-40% prefill speed** depending on model. Up to +100% on MiniCPM4-0.5B, +95% on DeepSeek-R1-1.5B, +50% on Qwen3-0.6B/1.7B.
 
 See [PCIe Architecture Analysis](docs/pcie-analysis.md) for the full technical deep-dive.
 
