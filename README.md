@@ -114,6 +114,21 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | genderage | Gender/Age | 0.479 | **0.357** | +34% | 2801 |
 | w600k_r50 | Embedding | 4.27 | **3.72** | +15% | 269 |
 
+### Stereo Depth, Video Segmentation, Speaker ID, Audio
+
+| Model | Task | Default (ms) | Optimized (ms) | Speedup |
+|-------|------|----------:|------------:|--------:|
+| EdgeTAM prompt enc | Video seg | 0.297 | **0.270** | +10% |
+| EdgeTAM prompt mask | Video seg | 0.765 | **0.732** | +4% |
+| gtcrn | Audio denoise | 1.607 | **1.434** | +12% |
+| 3D-Speaker ECAPA-TDNN | Speaker ID | 4.006 | **3.889** | +3% |
+| EdgeTAM mask decoder | Video seg | 5.338 | **5.184** | +3% |
+| 3D-Speaker Res2NetV2 | Speaker ID | 5.534 | **5.459** | +1% |
+| RAFT-stereo 256x640 | Stereo depth | 21.19 | **21.28** | ~0% |
+| EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% |
+| RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% |
+| IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% |
+
 ### Super-Resolution, Segmentation, Zero-Shot, Speech
 
 | Model | Task | Default (ms) | Optimized (ms) | Speedup |
@@ -143,19 +158,21 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 | Inference time | Example | Speedup |
 |:-:|:-:|:-:|
+| ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | < 0.5 ms | OCR classifier | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
-| ~1.4 ms | ResNet18 | **+37%** |
+| ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~7 ms | YOLOv5s | +5% |
 | ~29 ms | OCR detector | +1% |
+| ~143 ms | IGEV++ stereo depth | ~0% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**30+ models tested** across 10 categories: LLM (4 model sizes, 0.6B to 7B), vision detection, segmentation, classification, OCR, face recognition, super-resolution, zero-shot, speech recognition, and TTS.
+**40+ models tested** across 13 categories: LLM (4 model sizes, 0.6B to 7B), vision detection, segmentation, classification, OCR, face recognition, super-resolution, zero-shot, speech recognition, TTS, stereo depth, video segmentation, and speaker identification.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

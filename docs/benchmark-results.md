@@ -350,26 +350,127 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 | Inference time | Model | Speedup |
 |:-:|:-:|:-:|
+| ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | < 0.5 ms | OCR classifier (cls) | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
+| ~0.7 ms | EdgeTAM prompt mask | +4% |
 | ~1.4 ms | ResNet18 | **+37%** |
+| ~1.4 ms | gtcrn (audio denoise) | +12% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
-| ~3.7 ms | Insightface w600k_r50 | +15% |
 | ~3.5 ms | ResNet50 | +8% |
+| ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
+| ~5.2 ms | EdgeTAM mask decoder | +3% |
+| ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~11 ms | SigLIP2 vision | +1% |
-| ~21 ms | Whisper encoder | +1% |
+| ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
+| ~24 ms | EdgeTAM image encoder | +1% |
 | ~29 ms | OCR detector (det) | +1% |
 | ~51 ms | MobileSAM encoder | +1% |
+| ~113 ms | RAFT-stereo 384x1280 | ~0% |
+| ~143 ms | IGEV++ (RTIGEV) | ~0% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
-For LLM inference, the effect is even more dramatic (+100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
+For LLM inference, the effect is even more dramatic (+50%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead.
 
-**30+ models tested** across 10 categories confirm this pattern holds universally. For LLM, 4 model sizes from 0.6B to 7B were tested, all showing significant speedup (+27% to +100%).
+**40+ models tested** across 13 categories confirm this pattern holds universally. For LLM, 4 model sizes from 0.6B to 7B were tested, all showing significant speedup (+19% to +50%).
+
+## Stereo Depth Estimation
+
+### Test Configuration
+
+- **Models**: [IGEV++](https://huggingface.co/AXERA-TECH/IGEV-plusplus) and [RAFT-stereo](https://huggingface.co/AXERA-TECH/RAFT-stereo) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Input | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|-------|------------------:|--------------------:|--------:|
+| RAFT-stereo | 256x640 | 21.19 | **21.28** | ~0% |
+| IGEV++ (RTIGEV) | 480x640 | 143.40 | **143.06** | ~0% |
+| RAFT-stereo | 384x1280 | 112.55 | **112.40** | ~0% |
+
+### Analysis
+
+Stereo depth models show virtually no optimization benefit — they are heavily compute-bound (20-143ms). PCIe round-trip overhead (~0.3ms) is negligible compared to total inference time.
+
+## Video Segmentation — EdgeTAM
+
+### Test Configuration
+
+- **Models**: [EdgeTAM](https://huggingface.co/AXERA-TECH/EdgeTAM) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Prompt encoder | 0.297 | **0.270** | +10.0% |
+| Prompt mask encoder | 0.765 | **0.732** | +4.3% |
+| Mask decoder | 5.338 | **5.184** | +2.9% |
+| Image encoder | 23.88 | **23.73** | +0.6% |
+
+### Analysis
+
+EdgeTAM components follow the same speedup-vs-inference-time pattern. The tiny prompt encoder (0.27ms) benefits most. The image encoder (24ms) benefits least.
+
+## Speaker Identification — 3D-Speaker
+
+### Test Configuration
+
+- **Models**: [3D-Speaker](https://huggingface.co/AXERA-TECH/3D-Speaker) ECAPA-TDNN and Res2NetV2 (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| ECAPA-TDNN | 4.006 | **3.889** | +3.0% |
+| Res2NetV2 | 5.534 | **5.459** | +1.4% |
+
+### Comparison with Official Numbers (Native)
+
+| Model | Official native (ms) | Our AXCL optimized (ms) | PCIe overhead |
+|-------|---------------------:|------------------------:|--------------:|
+| IGEV++ (RTIGEV) | 139.80 | 143.06 | +2.3% |
+| RAFT-stereo 256x640 | 20.9 | 21.28 | +1.8% |
+| EdgeTAM image encoder | 22.35 | 23.73 | +6.2% |
+| EdgeTAM mask decoder | 4.73 | 5.18 | +9.5% |
+| EdgeTAM prompt encoder | 0.055 | 0.270 | +391% |
+| EdgeTAM prompt mask | 0.457 | 0.732 | +60% |
+| 3D-Speaker Res2NetV2 | 5.09 | 5.46 | +7.3% |
+| 3D-Speaker ECAPA-TDNN | 7.37* | 3.89 | faster (!) |
+
+*Note: ECAPA-TDNN official number is 7.37ms from Python pyaxengine. Our test uses C++ `axcl_run_model` which has lower overhead. The official test likely includes Python runtime costs.*
+
+Note: EdgeTAM prompt encoder shows 5x PCIe overhead (0.055 vs 0.27ms) — for extremely fast models (<0.1ms native), the PCIe round-trip latency completely dominates.
+
+## Audio Denoising — GTCRN
+
+### Test Configuration
+
+- **Models**: [gtcrn.axera](https://huggingface.co/AXERA-TECH/gtcrn.axera) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+- **NPU mode**: 1 Core
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| gtcrn | 1.607 | **1.434** | +12.1% |
+
+### Analysis
+
+GTCRN at 1.4ms inference time shows +12% speedup — consistent with the optimization pattern for sub-2ms models. Note: GTCRN runs on 1 NPU core (vs 3 cores for most models), making PCIe overhead a larger fraction of total time.
 
 ## Methodology
 
