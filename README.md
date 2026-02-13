@@ -222,6 +222,8 @@ npu3 variants use all 3 NPU cores (official config). Full OCR pipeline: **~1.5s*
 | ESPCN x2 | Super-resolution | 22.71 | **22.41** | +1% | 22 |
 | CLIP ViT-L/14 text | CLIP text | 6.39 | **5.82** | +10% | — |
 | CLIP ViT-L/14 image | CLIP image | 71.11 | **70.28** | +1% | — |
+| cnclip ViT-L/14 text | CLIP text (CN) | 5.04 | **4.35** | +14% | — |
+| cnclip ViT-L/14 vision | CLIP image (CN) | 114.1 | **113.4** | +0.7% | — |
 | SigLIP-so400m vision | Zero-shot img | 168.9 | **168.2** | +0.5% | — |
 | SigLIP-so400m text | Zero-shot txt | 23.51 | **22.88** | +3% | — |
 | RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% | — |
@@ -265,8 +267,14 @@ No AXCL aarch64 binary for end-to-end VLM; individual .axmodel components benchm
 | InternVL2.5-1B | Vision Encoder | 357.8 | **357.0** | +0.2% |
 | InternVL2.5-1B | LLM Layer | 1.648 | **1.020** | **+62%** |
 | InternVL2.5-1B | LLM Post | 7.533 | **7.098** | +6% |
+| InternVL3-1B | Vision Encoder | 365.9 | **365.0** | +0.2% |
+| InternVL3-1B | LLM Layer | 1.758 | **1.139** | **+54%** |
+| InternVL3-1B | LLM Post | 7.642 | **7.041** | +8% |
+| Janus-Pro-1B | Vision Encoder | 143.8 | **143.0** | +0.5% |
+| Janus-Pro-1B | LLM Layer | 3.924 | **3.354** | +15% |
+| Janus-Pro-1B | LLM Post | 11.195 | **10.410** | +7% |
 
-VLM decoder layers show +32-62% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%, native: 76.7), SmolVLM ~43→66 tok/s (+53%, native: 80), FastVLM ~22→29 tok/s (+28%, native: 34.8), InternVL2.5-1B ~21→32 tok/s (+52%, **matches native**: 32).
+VLM decoder layers show +15-62% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s, SmolVLM ~43→66 tok/s, FastVLM ~22→29 tok/s (native: 34.8), InternVL2.5-1B ~21→32 tok/s (**matches native**: 32), InternVL3-1B ~22→29 tok/s, Janus-Pro-1B ~8→11 tok/s.
 
 ### Optimization Effect Pattern
 
@@ -314,7 +322,7 @@ This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total t
 
 Zipformer joiner at +93% is the highest speedup for single-inference models. VLM decoder layers consistently show +32-62%. InternVL2.5-1B optimized **matches official native speed** (32 tok/s).
 
-**130+ models tested** across 29 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, embedding, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, 3D object detection, and more.
+**140+ models tested** across 29 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, embedding, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, 3D object detection, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

@@ -625,6 +625,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
 | ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
+| ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
@@ -637,12 +638,14 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~3.0 ms | Zipformer encoder | +19% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
+| ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | YOLO11s/QR YOLO26n/YOLO11n | +2-12% |
 | ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
 | ~4.0 ms | YOLOv8s detection | +10% |
+| ~4.4 ms | cnclip ViT-L/14 text | +14% |
 | ~4.6 ms | LibCLIP cnclip text | +10% |
 | ~4.7 ms | YOLO11s-Seg | +2% |
 | ~5.0 ms | YOLO26s-Seg/YOLOv8s-Seg | +4-12% |
@@ -650,13 +653,14 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
-| ~7.1 ms | InternVL2.5-1B LLM post | +6% |
+| ~7.0 ms | InternVL3-1B/InternVL2.5-1B LLM post | +6-8% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~7.5 ms | LivePortrait motion | +9% |
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
 | ~10 ms | YOLOv5s-Seg | +2% |
+| ~10.4 ms | Janus-Pro-1B LLM post | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
 | ~10.4 ms | ESPCN x2 2K | +2% |
 | ~11.3 ms | YOLOv8s-Pose | +0.2% |
@@ -688,15 +692,16 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~89 ms | LibCLIP cnclip vision | +0.8% |
 | ~92 ms | centerpoint/bevformer/MeloTTS | +0.5-0.7% |
 | ~99 ms | SmolVLM2/SmolVLM-256M vision | +0.7-1% |
+| ~113 ms | cnclip ViT-L/14 vision | +0.7% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~129 ms | FG-CLIP image encoder | +0.4% |
-| ~143 ms | IGEV++ (RTIGEV) | ~0% |
+| ~143 ms | Janus-Pro-1B vision/IGEV++ | ~0-0.5% |
 | ~168 ms | SigLIP-so400m vision | +0.5% |
 | ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
 | ~233 ms | LivePortrait spade | +0.3% |
 | ~309 ms | EDSR baseline x2 2K | +0.2% |
-| ~357 ms | InternVL2.5-1B vision | +0.2% |
+| ~357 ms | InternVL2.5-1B/InternVL3-1B vision | +0.2% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
 | ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
@@ -707,11 +712,11 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
-For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-62% improvement — consistent with the LLM pattern.
+For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +15-62% improvement — consistent with the LLM pattern.
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**130+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 4 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
+**140+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 6 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5, InternVL3, Janus-Pro). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1250,6 +1255,75 @@ PPOCR_v5 npu3 variants are significantly faster than npu1 (det: 18ms vs 29ms, re
 ### Analysis
 
 At 35ms, the model is compute-bound with minimal PCIe overhead benefit (+1.6%). Optimized reaches 93% of native speed.
+
+## VLM — Janus-Pro-1B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [Janus-Pro-1B](https://huggingface.co/AXERA-TECH/Janus-Pro-1B) — DeepSeek Janus Pro 1B, 24 LLaMA layers + post + SigLIP vision encoder
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (janus_warp_vit) | 143.761 | **142.996** | +0.5% |
+| LLM Layer (llama l0) | 3.924 | **3.354** | +15.0% |
+| LLM Post | 11.195 | **10.410** | +7.0% |
+
+### Estimated Decode Speed
+
+- Default: ~8 tok/s (24×3.924 + 11.195 ≈ 105.4 ms/tok)
+- Optimized: ~11 tok/s (24×3.354 + 10.410 ≈ 90.9 ms/tok)
+
+### Analysis
+
+Janus-Pro-1B has larger LLM layers (~3.4ms) compared to InternVL (1ms), resulting in lower per-layer speedup (+15% vs +54-62%). However, the absolute improvement is still significant: ~8→11 tok/s. Vision encoder at 143ms is fully compute-bound. The LLaMA architecture in Janus differs from the Qwen2 used in InternVL, but the PCIe overhead pattern is consistent.
+
+## VLM — InternVL3-1B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL3-1B](https://huggingface.co/AXERA-TECH/InternVL3-1B) — InternVL 3rd generation, 24 Qwen2 layers + post + InternViT vision encoder
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (internvl3_1b_vit) | 365.868 | **365.036** | +0.2% |
+| LLM Layer (qwen2 l0) | 1.758 | **1.139** | +54.3% |
+| LLM Post | 7.642 | **7.041** | +7.9% |
+
+### Estimated Decode Speed
+
+- Default: ~22 tok/s (24×1.758 + 7.642 ≈ 49.8 ms/tok)
+- Optimized: ~29 tok/s (24×1.139 + 7.041 ≈ 34.4 ms/tok)
+
+### Analysis
+
+InternVL3-1B shows very similar performance to InternVL2.5-1B (both use 24 Qwen2 layers). Layer speedup +54% vs +62% — slightly less due to marginally larger layers (1.14ms vs 1.02ms). Both generations reach ~29-32 tok/s optimized. The vision encoder is slightly larger (365ms vs 358ms) but equally compute-bound.
+
+## CLIP — cnclip ViT-L/14-336px (Chinese CLIP)
+
+### Test Configuration
+
+- **Models**: [cnclip](https://huggingface.co/AXERA-TECH/cnclip) — Chinese CLIP ViT-L/14-336px, text and vision encoders (u16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Text (u16) | 5.044 | **4.351** | +14.0% |
+| Vision (u16) | 114.130 | **113.359** | +0.7% |
+
+### Analysis
+
+cnclip text encoder at 4.4ms shows +14% — consistent with other text encoders in this latency range (LibCLIP cnclip text: 4.6ms +10%, CLIP ViT-L/14 text: 5.8ms +10%). Vision encoder at 113ms is compute-bound (+0.7%).
 
 ## Portrait Animation — LivePortrait
 
