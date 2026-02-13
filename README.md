@@ -135,6 +135,13 @@ Key effect on vision: **2-22% faster + 2-3x more stable** latency (critical for 
 
 Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-99% accuracy).
 
+### Scene Text Recognition — SATRN
+
+| Model | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|----------:|------------:|--------:|------------:|
+| SATRN backbone+encoder | 7.43 | **7.35** | +1% | 6.09 |
+| SATRN decoder | 2.17 | **1.58** | **+37%** | 1.38 |
+
 ### Face Recognition — Insightface
 
 | Model | Task | Default (ms) | Optimized (ms) | Speedup | FPS | Native (ms) |
@@ -157,6 +164,7 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% | 22.35 |
 | RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% | — |
 | IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% | 139.80 |
+| mel_band_roformer | Music separation | 426.3 | **425.6** | +0.2% | — |
 
 ### Tracking, Segmentation, Keypoints, QR Detection
 
@@ -188,6 +196,12 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | SenseVoice full | ASR (5 langs) | 55.33 | **54.69** | +1% | — |
 | MobileCLIP2-S0 | CLIP image | 8.63 | **8.49** | +2% | — |
 | MobileCLIP2-S4 | CLIP image | 64.94 | **64.34** | +1% | 65.3 |
+| LibCLIP cnclip vision | CLIP image (CN) | 89.44 | **88.76** | +0.8% | 88.48 |
+| LibCLIP cnclip text | CLIP text (CN) | 5.04 | **4.58** | +10% | 4.58 |
+| FG-CLIP image | CLIP image | 129.2 | **128.7** | +0.4% | 125.2 |
+| FG-CLIP text | CLIP text | 11.67 | **11.08** | +5% | 10.82 |
+| jina-clip-v2 image | CLIP image | 597.2 | **596.2** | +0.2% | 592.2 |
+| jina-clip-v2 text | CLIP text | 15.31 | **14.86** | +3% | 15.48 |
 | RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% | — |
 | CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% | — |
 | DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% | — |
@@ -199,6 +213,16 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | TTFT | 125 ms | **108 ms** | +16% |
 | LLM Decode | 13.9 tok/s | **16.3 tok/s** | +17% |
 | RTF (Real-Time Factor) | 2.0-3.7x | **1.7-1.9x** | |
+
+### Embedding / RAG
+
+| Model | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|----------:|------------:|--------:|------------:|
+| bge-small-en-v1.5 | 35.25 | **34.74** | +1.5% | 32.4 |
+| Qwen3-Embedding Layer (×28) | 2.03 | **1.80** | +12.5% | — |
+| Qwen3-Embedding Post | 8.67 | **8.09** | +7% | — |
+
+Qwen3-Embedding (28 layers, W8A16) — same architecture as Qwen3-0.6B LLM. Decoder layers show +12.5% speedup, consistent with LLM pattern.
 
 ### VLM — SmolVLM2-256M & FastVLM-0.5B (Component Benchmarks)
 
@@ -225,6 +249,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 | ~0.3 ms | Insightface genderage | **+34%** |
 | < 0.5 ms | OCR classifier | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
+| ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
@@ -238,7 +263,7 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**90+ models tested** across 25 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
+**100+ models tested** across 27 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

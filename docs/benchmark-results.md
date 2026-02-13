@@ -623,7 +623,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
 | ~1.6 ms | SmolVLM2-256M LLM post | +21% |
+| ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
+| ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
@@ -632,6 +634,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
 | ~5.0 ms | YOLO26s-Seg | +12% |
+| ~4.6 ms | LibCLIP cnclip text | +10% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
@@ -640,10 +643,10 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
-| ~11 ms | SigLIP2 vision | +1% |
+| ~11 ms | FG-CLIP text/SigLIP2 vision | +1-5% |
 | ~12.2 ms | YOLO26l-Pose | +6% |
 | ~12.4 ms | SenseVoice streaming | +6% |
-| ~13 ms | YOLOv7-Face/DeepLabv3Plus/MobileCLIP2-S4 text | +1-4% |
+| ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~23 ms | Depth-Anything-3 small | +3% |
@@ -658,21 +661,25 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~55 ms | SenseVoice (full) | +1% |
 | ~65 ms | MobileCLIP2-S4 image | +1% |
 | ~68 ms | Depth-Anything-3 base | +1% |
+| ~89 ms | LibCLIP cnclip vision | +0.8% |
 | ~99 ms | SmolVLM2-256M vision encoder | +1% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
 | ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
+| ~129 ms | FG-CLIP image encoder | +0.4% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
+| ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~498 ms | DeOldify artistic | +0.2% |
+| ~597 ms | jina-clip-v2 image encoder | +0.2% |
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
 For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-45% improvement — consistent with the LLM pattern.
 
-**90+ models tested** across 25 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
+**100+ models tested** across 27 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
 
 ## Stereo Depth Estimation
 
@@ -916,6 +923,87 @@ QR code detectors are compact nano-sized models (~4ms inference), making them go
 | Model | Source | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
 |-------|--------|------------------:|--------------------:|--------:|--------------:|
 | DEIMv2 DINOv3-S | [AXERA-TECH](https://huggingface.co/AXERA-TECH/DEIMv2) | 43.054 | **42.424** | +1.5% | 24 |
+
+## Scene Text Recognition — SATRN
+
+### Test Configuration
+
+- **Models**: [SATRN](https://huggingface.co/AXERA-TECH/satrn) (backbone+encoder + decoder, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------------------:|--------------------:|--------:|------------:|
+| backbone+encoder | 7.431 | **7.347** | +1.1% | 6.085 |
+| decoder | 2.170 | **1.582** | **+37.2%** | 1.384 |
+
+### Analysis
+
+SATRN decoder at 2.17ms shows **+37% speedup** — among the highest for any vision model. This tiny decoder is extremely sensitive to PCIe latency. The backbone+encoder (7.3ms) shows only +1%, consistent with the inference-time pattern.
+
+## Embedding / RAG
+
+### Test Configuration
+
+- **Models**: [bge-small-en-v1.5](https://huggingface.co/AXERA-TECH/bge-small-en-v1.5) and [Qwen3-Embedding-0.6B](https://huggingface.co/AXERA-TECH/Qwen3-Embedding-0.6B) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------------------:|--------------------:|--------:|------------:|
+| bge-small-en-v1.5 (batch 1) | 35.252 | **34.744** | +1.5% | 32.4 |
+| bge-small-en-v1.5 (batch 2) | 63.584 | **63.152** | +0.7% | — |
+| Qwen3-Embedding Layer (×28) | 2.025 | **1.800** | +12.5% | — |
+| Qwen3-Embedding Post | 8.672 | **8.088** | +7.2% | — |
+
+### Analysis
+
+Qwen3-Embedding-0.6B has the same architecture as Qwen3-0.6B LLM (28 layers, W8A16). Individual decoder layers show +12.5% — consistent with the LLM pattern. Estimated full embedding: 28×1.80 + 8.09 ≈ 58.5ms (optimized) vs 28×2.03 + 8.67 ≈ 65.5ms (baseline). bge-small at 35ms is compute-bound with minimal PCIe overhead.
+
+## CLIP — FG-CLIP, jina-clip-v2, LibCLIP
+
+### Test Configuration
+
+- **Models**: [FG-CLIP](https://huggingface.co/AXERA-TECH/FG-CLIP) (Qihoo 360), [jina-clip-v2](https://huggingface.co/AXERA-TECH/jina-clip-v2) (Jina AI), [LibCLIP/cnclip](https://huggingface.co/AXERA-TECH/LibCLIP) (Chinese CLIP ViT-L/14-336px)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 50-100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| LibCLIP cnclip text | 5.036 | **4.579** | +10.0% | 4.576 |
+| FG-CLIP text encoder | 11.668 | **11.077** | +5.1% | 10.817 |
+| jina-clip-v2 text encoder | 15.308 | **14.860** | +2.9% | 15.482 |
+| LibCLIP cnclip vision | 89.439 | **88.763** | +0.8% | 88.475 |
+| FG-CLIP image encoder | 129.194 | **128.688** | +0.4% | 125.197 |
+| jina-clip-v2 image encoder | 597.219 | **596.199** | +0.2% | 592.231 |
+
+### Analysis
+
+CLIP models clearly demonstrate the optimization pattern: text encoders (5-15ms) benefit more than image encoders (89-597ms). Notable: LibCLIP text at 4.579ms exactly matches official native (4.576ms). jina-clip-v2 text (14.86ms) is actually faster than official native (15.48ms). Image encoders are compute-bound with minimal PCIe overhead.
+
+## Music Source Separation — MelBandRoformer
+
+### Test Configuration
+
+- **Models**: [mel_band_roformer](https://huggingface.co/AXERA-TECH/mel_band_roformer) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| mel_band_roformer | 426.329 | **425.619** | +0.2% |
+
+### Analysis
+
+At 426ms, mel_band_roformer is fully compute-bound — PCIe optimization has negligible effect. This model separates music into stems (bass, drums, vocals). Processing is offline (not real-time), so absolute speed matters more than latency consistency.
 
 ## Methodology
 
