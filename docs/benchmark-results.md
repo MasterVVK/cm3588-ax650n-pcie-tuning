@@ -663,7 +663,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2/Insightface 2d106det | **+20-50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
-| ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
+| ~1.0 ms | InternVL2.5-1B LLM layer/SmolVLM2-500M LLM layer | **+25-62%** |
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
@@ -678,10 +678,10 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~2.6 ms | Insightface 1k3d68 (3D landmarks) | +15% |
-| ~2.7 ms | FastVLM-1.5B LLM layer | +16% |
-| ~3.0 ms | Zipformer encoder | +19% |
+| ~2.7 ms | SmolVLM2-500M Post/FastVLM-1.5B LLM layer | +11-16% |
+| ~3.0 ms | Zipformer encoder/InternVL3-2B LLM layer | +5-19% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
-| ~3.2 ms | Qwen3-VL-2B LLM layer | +9% |
+| ~3.2 ms | Qwen3-VL-2B LLM layer/InternVL3.5-2B LLM layer | +9% |
 | ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | YOLO11s/YOLO26s-Det/QR YOLO26n/YOLO11n | +2-12% |
@@ -1389,6 +1389,87 @@ InternVL3-1B shows very similar performance to InternVL2.5-1B (both use 24 Qwen2
 ### Analysis
 
 InternVL3.5-1B uses Qwen3 architecture (vs Qwen2 in InternVL3-1B), with 28 layers instead of 24. The layer speedup (+25.5%) is lower than InternVL3-1B (+54%) because Qwen3 layers are larger (1.5ms vs 1.1ms). The vision encoder reuses InternViT (365ms, identical to InternVL3-1B). Optimized decode speed reaches **91% of native** (20 vs 21.6 tok/s).
+
+## VLM — InternVL3.5-2B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL3_5-2B](https://huggingface.co/AXERA-TECH/InternVL3_5-2B) — InternVL 3.5 generation 2B, 28 Qwen3 layers + post + InternViT vision encoder
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+- **Note**: Official native: 9.52 tok/s
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (448x448) | 384.943 | **384.257** | +0.2% |
+| LLM Layer (Qwen3 l0) | 3.609 | **3.318** | +8.8% |
+| LLM Post | 16.360 | **15.671** | +4.4% |
+
+### Estimated Decode Speed
+
+- Default: ~9 tok/s (28×3.609 + 16.360 ≈ 117.4 ms/tok)
+- Optimized: ~9.2 tok/s (28×3.318 + 15.671 ≈ 108.6 ms/tok)
+- **Native: 9.52 tok/s** — optimization reaches 97% of native
+
+### Analysis
+
+InternVL3.5-2B has the same architecture as InternVL3.5-1B but with larger Qwen3 layers (3.3ms vs 1.5ms). The layer speedup (+8.8%) is lower than the 1B variant (+25.5%) — consistent with larger layers having less PCIe overhead. Vision encoder uses a slightly different InternViT (384ms vs 365ms). At 97% of native speed, the PCIe overhead is nearly eliminated.
+
+## VLM — InternVL3-2B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL3-2B](https://huggingface.co/AXERA-TECH/InternVL3-2B) — InternVL 3rd generation 2B, 28 Qwen2 layers + post + InternViT vision encoder (W8A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+- **Note**: Official native: 10 tok/s
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (448x448) | 366.387 | **365.861** | +0.1% |
+| LLM Layer (Qwen2 l0) | 3.192 | **3.039** | +5.0% |
+| LLM Post | 12.057 | **11.699** | +3.1% |
+
+### Estimated Decode Speed
+
+- Default: ~10 tok/s (28×3.192 + 12.057 ≈ 101.4 ms/tok)
+- Optimized: ~10.3 tok/s (28×3.039 + 11.699 ≈ 96.8 ms/tok)
+- **Native: 10 tok/s** — optimization reaches **103% of native!**
+
+### Analysis
+
+InternVL3-2B (Qwen2 architecture) optimized speed slightly exceeds official native (10.3 vs 10 tok/s). This is likely because official benchmarks include Python runtime overhead. At 3ms per layer, the +5% optimization benefit is modest but sufficient to fully compensate for PCIe overhead. InternVL3-2B uses a "slim" ViT variant (366ms).
+
+## VLM — SmolVLM2-500M-Video (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [SmolVLM2-500M-Video-Instruct](https://huggingface.co/AXERA-TECH/SmolVLM2-500M-Video-Instruct_Ax650) — HuggingFace SmolVLM2 500M, 30 LLaMA layers + post + vision encoder (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 50 iterations (post), 10 iterations (vision), 3-5 warmup
+- **Note**: Official native: 35.23 tok/s (image), 35.32 tok/s (video)
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (512x512) | 99.699 | **98.829** | +0.9% |
+| LLM Layer (LLaMA l0) | 1.225 | **0.979** | **+25.1%** |
+| LLM Post | 3.051 | **2.743** | +11.2% |
+
+### Estimated Decode Speed
+
+- Default: ~25 tok/s (30×1.225 + 3.051 ≈ 39.8 ms/tok)
+- Optimized: ~31 tok/s (30×0.979 + 2.743 ≈ 32.1 ms/tok)
+- **Native: 35.23 tok/s** — optimization reaches 88% of native
+
+### Analysis
+
+SmolVLM2-500M layers at 0.98ms show **+25% speedup** — consistent with sub-1ms models being very PCIe-latency-sensitive. The 30 LLaMA layers are slightly larger than SmolVLM2-256M layers. Post at 2.7ms also benefits significantly (+11%). At 31 tok/s via PCIe, this is the fastest 500M+ VLM measured. Native 35 tok/s means 88% efficiency.
 
 ## VLM — Qwen3-VL-2B (Component Benchmarks)
 
