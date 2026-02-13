@@ -672,6 +672,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | InternVL3.5-1B LLM layer (Int4) | **+26%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
+| ~1.4 ms | Qwen3-0.6B LLM layer (Int4) | **+24%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
 | ~1.5 ms | InternVL3.5-1B LLM layer (Qwen3) | **+26%** |
@@ -1691,6 +1692,32 @@ For streaming ASR, the joiner and decoder are called once per frame (typically e
 ### Analysis
 
 CAM++ at 3.1ms shows +17% optimization benefit — consistent with models in the 3-4ms latency range. This is a speaker embedding model used for speaker diarization in meeting transcription. At 322 inferences/sec, it can process audio segments much faster than real-time. The existing 3D-Speaker ECAPA-TDNN (3.9ms, +3%) uses a different architecture; CAM++ is significantly more PCIe-latency-sensitive despite similar inference time.
+
+## LLM — Qwen3-0.6B GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [Qwen3-0.6B-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Qwen3-0.6B-GPTQ-Int4) — Alibaba Qwen3 0.6B, 28 layers + post (W4A16), C256 P1024 CTX2047
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 20 iterations (post), 3-5 warmup
+- **Note**: Official native (W8A16): 19-20 tok/s. End-to-end W8A16 optimized: 10-12 tok/s.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| LLM Layer (Qwen3 l0) | 1.676 | **1.357** | +23.5% |
+| LLM Post (CMM 170M) | 8.655 | **8.125** | +6.5% |
+
+### Estimated Decode Speed
+
+- Default: ~18 tok/s (28×1.676 + 8.655 ≈ 55.6 ms/tok)
+- Optimized: ~21.7 tok/s (28×1.357 + 8.125 ≈ 46.1 ms/tok)
+- **Native (W8A16): 19-20 tok/s** — Int4 optimization **exceeds native W8A16!**
+
+### Analysis
+
+Qwen3-0.6B GPTQ-Int4 estimated 21.7 tok/s exceeds official native W8A16 speed (19-20 tok/s). The W8A16 end-to-end optimized benchmark showed 10-12 tok/s because it includes tokenization, prompt processing, and Python/C++ runtime overhead. The component benchmark isolates pure NPU inference, showing that Int4 quantization makes the 0.6B model fast enough to overcome PCIe overhead. Layer speedup (+23.5%) at 1.4ms is consistent with the InternVL3.5-1B Int4 result (+26% at 1.2ms). This confirms a general pattern: **Int4 quantization + PCIe optimization can exceed native W8A16 performance** on the AX650N.
 
 ## Translation LLM — HY-MT1.5-1.8B (Component Benchmarks)
 
