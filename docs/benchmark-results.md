@@ -321,18 +321,18 @@ These experiments were conducted to test whether PCIe register tuning could impr
 | YOLO26n-Pose | 2.083 | **1.708** | +22.0% | 586 | 1.525 |
 | YOLO26s-Pose | 4.071 | **3.717** | +9.5% | 269 | 3.528 |
 | YOLO26m-Pose | 10.252 | **9.621** | +6.6% | 104 | 9.296 |
-| YOLO26l-Pose | 12.899 | **12.159** | +6.1% | 82 | — |
-| YOLO26x-Pose | 26.377 | **25.709** | +2.6% | 39 | — |
+| YOLO26l-Pose | 12.899 | **12.159** | +6.1% | 82 | 11.963 |
+| YOLO26x-Pose | 26.377 | **25.709** | +2.6% | 39 | 25.128 |
 
 ### YOLO26-Seg (NPU 3-core, 640x640)
 
-| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
-|-------|------------------:|--------------------:|--------:|--------------:|
-| YOLO26n-Seg | 2.861 | **2.337** | +22.4% | 428 |
-| YOLO26s-Seg | 5.614 | **5.035** | +11.5% | 199 |
-| YOLO26m-Seg | 15.260 | **14.648** | +4.2% | 68 |
-| YOLO26l-Seg | 17.563 | **17.270** | +1.7% | 58 |
-| YOLO26x-Seg | 38.058 | **37.334** | +1.9% | 27 |
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS | Native (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|------------:|
+| YOLO26n-Seg | 2.861 | **2.337** | +22.4% | 428 | 1.972 |
+| YOLO26s-Seg | 5.614 | **5.035** | +11.5% | 199 | 4.703 |
+| YOLO26m-Seg | 15.260 | **14.648** | +4.2% | 68 | 14.275 |
+| YOLO26l-Seg | 17.563 | **17.270** | +1.7% | 58 | 16.675 |
+| YOLO26x-Seg | 38.058 | **37.334** | +1.9% | 27 | 36.701 |
 
 ### Depth-Anything-3 (NPU 3-core)
 
@@ -776,9 +776,9 @@ GTCRN at 1.4ms inference time shows +12% speedup — consistent with the optimiz
 
 ### With vs Without Optimization
 
-| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
-|-------|------------------:|--------------------:|--------:|
-| RIFE x2 720p | 210.522 | **209.761** | +0.4% |
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------------------:|--------------------:|--------:|------------:|
+| RIFE x2 720p | 210.522 | **209.761** | +0.4% | ~200 |
 | RIFE x2 1080p | — | — | CMM overflow |
 | RIFE x2 4K | — | — | CMM overflow |
 

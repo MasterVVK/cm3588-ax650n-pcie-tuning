@@ -96,23 +96,23 @@ MiniCPM4-0.5B and SmolLM2-360M show the highest optimization gains at **+75-100%
 
 ### YOLO26 Pose Estimation & Segmentation (NPU 3-core, 640x640)
 
-| Model | Default (ms) | Optimized (ms) | Speedup | FPS |
-|-------|----------:|------------:|--------:|----:|
-| YOLO26n-Pose | 2.08 | **1.71** | **+22%** | 586 |
-| YOLO26n-Seg | 2.86 | **2.34** | **+22%** | 428 |
-| YOLO26s-Pose | 4.07 | **3.72** | +10% | 269 |
-| YOLO26s-Seg | 5.61 | **5.04** | +12% | 199 |
-| YOLO26m-Pose | 10.25 | **9.62** | +7% | 104 |
-| YOLO26x-Pose | 26.38 | **25.71** | +3% | 39 |
+| Model | Default (ms) | Optimized (ms) | Speedup | FPS | Native (ms) |
+|-------|----------:|------------:|--------:|----:|------------:|
+| YOLO26n-Pose | 2.08 | **1.71** | **+22%** | 586 | 1.53 |
+| YOLO26n-Seg | 2.86 | **2.34** | **+22%** | 428 | 1.97 |
+| YOLO26s-Pose | 4.07 | **3.72** | +10% | 269 | 3.53 |
+| YOLO26s-Seg | 5.61 | **5.04** | +12% | 199 | 4.70 |
+| YOLO26m-Pose | 10.25 | **9.62** | +7% | 104 | 9.30 |
+| YOLO26x-Pose | 26.38 | **25.71** | +3% | 39 | 25.13 |
 
 YOLO26 nano models show **+22% speedup** — among the highest for vision models. Full n/s/m/l/x results in [benchmark details](docs/benchmark-results.md).
 
 ### Depth-Anything-3
 
-| Model | Default (ms) | Optimized (ms) | Speedup |
-|-------|----------:|------------:|--------:|
-| DA3-small | 24.02 | **23.28** | +3% |
-| DA3-base | 68.51 | **67.71** | +1% |
+| Model | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|----------:|------------:|--------:|------------:|
+| DA3-small | 24.02 | **23.28** | +3% | 22.77 |
+| DA3-base | 68.51 | **67.71** | +1% | 67.34 |
 
 Key effect on vision: **2-22% faster + 2-3x more stable** latency (critical for real-time pipelines).
 
@@ -137,26 +137,26 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 
 ### Face Recognition — Insightface
 
-| Model | Task | Default (ms) | Optimized (ms) | Speedup | FPS |
-|-------|------|----------:|------------:|--------:|----:|
-| det_10g | Detection | 7.36 | **6.86** | +7% | 146 |
-| genderage | Gender/Age | 0.479 | **0.357** | +34% | 2801 |
-| w600k_r50 | Embedding | 4.27 | **3.72** | +15% | 269 |
+| Model | Task | Default (ms) | Optimized (ms) | Speedup | FPS | Native (ms) |
+|-------|------|----------:|------------:|--------:|----:|------------:|
+| det_10g | Detection | 7.36 | **6.86** | +7% | 146 | 6.95 |
+| genderage | Gender/Age | 0.479 | **0.357** | +34% | 2801 | 0.30 |
+| w600k_r50 | Embedding | 4.27 | **3.72** | +15% | 269 | 3.99 |
 
 ### Stereo Depth, Video Segmentation, Speaker ID, Audio
 
-| Model | Task | Default (ms) | Optimized (ms) | Speedup |
-|-------|------|----------:|------------:|--------:|
-| EdgeTAM prompt enc | Video seg | 0.297 | **0.270** | +10% |
-| EdgeTAM prompt mask | Video seg | 0.765 | **0.732** | +4% |
-| gtcrn | Audio denoise | 1.607 | **1.434** | +12% |
-| 3D-Speaker ECAPA-TDNN | Speaker ID | 4.006 | **3.889** | +3% |
-| EdgeTAM mask decoder | Video seg | 5.338 | **5.184** | +3% |
-| 3D-Speaker Res2NetV2 | Speaker ID | 5.534 | **5.459** | +1% |
-| RAFT-stereo 256x640 | Stereo depth | 21.19 | **21.28** | ~0% |
-| EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% |
-| RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% |
-| IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% |
+| Model | Task | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|------|----------:|------------:|--------:|------------:|
+| EdgeTAM prompt enc | Video seg | 0.297 | **0.270** | +10% | 0.06 |
+| EdgeTAM prompt mask | Video seg | 0.765 | **0.732** | +4% | 0.46 |
+| gtcrn | Audio denoise | 1.607 | **1.434** | +12% | — |
+| 3D-Speaker ECAPA-TDNN | Speaker ID | 4.006 | **3.889** | +3% | — |
+| EdgeTAM mask decoder | Video seg | 5.338 | **5.184** | +3% | 4.73 |
+| 3D-Speaker Res2NetV2 | Speaker ID | 5.534 | **5.459** | +1% | 5.09 |
+| RAFT-stereo 256x640 | Stereo depth | 21.19 | **21.28** | ~0% | 20.9 |
+| EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% | 22.35 |
+| RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% | — |
+| IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% | 139.80 |
 
 ### Tracking, Segmentation, Keypoints, QR Detection
 
@@ -172,25 +172,25 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 
 ### Super-Resolution, Zero-Shot, Speech, Restoration
 
-| Model | Task | Default (ms) | Optimized (ms) | Speedup |
-|-------|------|----------:|------------:|--------:|
-| Real-ESRGAN x4 | 64→256 upscale | 15.85 | **15.66** | +1% |
-| Real-ESRGAN x4 | 256→1024 upscale | 476.2 | **475.4** | +0.2% |
-| MobileSAM encoder | Segmentation | 51.52 | **50.92** | +1% |
-| MobileSAM decoder | Segmentation | 10.59 | **10.35** | +2% |
-| SigLIP2 vision | Zero-shot img | 11.48 | **11.37** | +1% |
-| SigLIP2 text | Zero-shot txt | 5.00 | **4.57** | +10% |
-| RT-DETR | Detection | 9.52 | **9.35** | +2% |
-| YOLO-World | Detection | 9.71 | **9.25** | +5% |
-| Whisper-tiny enc | Speech-to-text | 21.27 | **21.13** | +1% |
-| Whisper-tiny dec | Speech-to-text | 4.05 | **3.93** | +3% |
-| SenseVoice stream | ASR (5 langs) | 13.11 | **12.37** | +6% |
-| SenseVoice full | ASR (5 langs) | 55.33 | **54.69** | +1% |
-| MobileCLIP2-S0 | CLIP image | 8.63 | **8.49** | +2% |
-| MobileCLIP2-S4 | CLIP image | 64.94 | **64.34** | +1% |
-| RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% |
-| CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% |
-| DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% |
+| Model | Task | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|------|----------:|------------:|--------:|------------:|
+| Real-ESRGAN x4 | 64→256 upscale | 15.85 | **15.66** | +1% | 15.0 |
+| Real-ESRGAN x4 | 256→1024 upscale | 476.2 | **475.4** | +0.2% | 440 |
+| MobileSAM encoder | Segmentation | 51.52 | **50.92** | +1% | 49.5 |
+| MobileSAM decoder | Segmentation | 10.59 | **10.35** | +2% | 9.93 |
+| SigLIP2 vision | Zero-shot img | 11.48 | **11.37** | +1% | 11.1 |
+| SigLIP2 text | Zero-shot txt | 5.00 | **4.57** | +10% | 4.56 |
+| RT-DETR | Detection | 9.52 | **9.35** | +2% | — |
+| YOLO-World | Detection | 9.71 | **9.25** | +5% | — |
+| Whisper-tiny enc | Speech-to-text | 21.27 | **21.13** | +1% | — |
+| Whisper-tiny dec | Speech-to-text | 4.05 | **3.93** | +3% | — |
+| SenseVoice stream | ASR (5 langs) | 13.11 | **12.37** | +6% | — |
+| SenseVoice full | ASR (5 langs) | 55.33 | **54.69** | +1% | — |
+| MobileCLIP2-S0 | CLIP image | 8.63 | **8.49** | +2% | — |
+| MobileCLIP2-S4 | CLIP image | 64.94 | **64.34** | +1% | 65.3 |
+| RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% | — |
+| CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% | — |
+| DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% | — |
 
 ### TTS — CosyVoice3 (Russian text on NPU)
 
@@ -213,7 +213,7 @@ No AXCL aarch64 binary for end-to-end VLM; individual .axmodel components benchm
 | FastVLM-0.5B | LLM Layer | 1.547 | **1.170** | **+32%** |
 | FastVLM-0.5B | LLM Post | 7.538 | **7.043** | +7% |
 
-VLM decoder layers show +32-45% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%), FastVLM ~22→29 tok/s (+28%).
+VLM decoder layers show +32-45% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%, native: 76.7), FastVLM ~22→29 tok/s (+28%, native: 34.8).
 
 ### Optimization Effect Pattern
 
