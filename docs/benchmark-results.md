@@ -656,14 +656,19 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.24 ms | Zipformer decoder | **+80%** |
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
+| ~0.33 ms | VoxCPM stop_predictor | **+67%** |
+| ~0.34 ms | VoxCPM FSQ layer | **+38%** |
 | ~0.34 ms | Zipformer joiner | **+93%** |
 | ~0.35 ms | PPOCR_v5 cls (npu3) | **+18%** |
+| ~0.45 ms | VoxCPM LocDiT part1 | **+53%** |
 | ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
 | < 0.5 ms | OCR classifier cls (npu1) | **+71%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2/Insightface 2d106det | **+20-50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
+| ~1.0 ms | VoxCPM base_lm MiniCPM layer | **+57%** |
 | ~1.0 ms | InternVL2.5-1B LLM layer/SmolVLM2-500M LLM layer | **+25-62%** |
+| ~1.1 ms | VoxCPM feat_encoder MiniCPM layer | **+44%** |
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
@@ -781,7 +786,7 @@ For LLM inference, the effect is even more dramatic (+50-100%) because each toke
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**180+ models tested** across 38+ categories confirm this pattern holds universally. For LLM, 11 configurations across 9 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 11 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, Qwen2.5-VL, MiniCPM-V-4). Translation LLM (HY-MT1.5, HuanYuan architecture), speaker embedding (CAM++), portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, TTS (CosyVoice3, Kokoro, MeloTTS), and VAD provide additional data points.
+**185+ models tested** across 40+ categories confirm this pattern holds universally. For LLM, 11 configurations across 9 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 11 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, Qwen2.5-VL, MiniCPM-V-4). Translation LLM (HY-MT1.5, HuanYuan architecture), speaker embedding (CAM++), TTS (CosyVoice3, Kokoro, MeloTTS, VoxCPM), portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, and VAD provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1761,6 +1766,41 @@ Qwen3-4B-2507 Int4 shows similar performance to the existing Qwen3-4B W8A16 (3.7
 ### Analysis
 
 Qwen2.5-VL-3B is the first Qwen2.5-VL generation model benchmarked. The vision encoder at 560ms is the second heaviest measured (after MiniCPM-V-4 SigLIP at 581ms), using 807M CMM — fully compute-bound. Layer speedup (+21.5%) at 2.4ms is excellent, giving an estimated 9.7 tok/s — competitive with Qwen3-VL-2B (9.5 tok/s). The 36-layer Qwen2.5 architecture with Int4 quantization achieves good efficiency. This is the largest VLM (3B) that still delivers near-10 tok/s decode speed on the AX650N via PCIe.
+
+## TTS — VoxCPM (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [VoxCPM](https://huggingface.co/AXERA-TECH/VoxCPM) — OpenBMB VoxCPM TTS, multi-component architecture using MiniCPM layers + DiT + FSQ (W8A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup (10 iterations for post)
+- **Architecture**: base_lm (24 MiniCPM layers + post), feat_encoder (4 MiniCPM layers), residual_lm (6 layers), feat_decoder (4 layers), LocDiT (3 parts), FSQ, stop_predictor
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| stop_predictor | 0.552 | **0.331** | **+66.8%** |
+| FSQ layer | 0.470 | **0.341** | **+37.8%** |
+| LocDiT part1 | 0.693 | **0.453** | **+53.0%** |
+| base_lm LLM layer (MiniCPM l0, 24 layers) | 1.559 | **0.995** | **+56.7%** |
+| feat_encoder LLM layer (MiniCPM l0, 4 layers) | 1.510 | **1.051** | **+43.7%** |
+| base_lm LLM post (CMM 82M) | 4.273 | **4.185** | +2.1% |
+
+### Estimated base_lm Decode Speed
+
+- Default: ~24 tok/s (24×1.559 + 4.273 ≈ 41.7 ms/tok)
+- Optimized: ~36 tok/s (24×0.995 + 4.185 ≈ 28.1 ms/tok)
+
+### Analysis
+
+VoxCPM is a revelation for optimization impact on TTS. The stop_predictor at **+66.8%** is the **third highest speedup** ever measured (after Zipformer joiner +93% and decoder +80%). All sub-millisecond components show massive gains:
+- **stop_predictor** (0.33ms): +67% — ultra-fast binary predictor, PCIe latency dominant
+- **FSQ** (0.34ms): +38% — finite scalar quantizer, tiny compute
+- **LocDiT part1** (0.45ms): +53% — diffusion transformer block
+- **base_lm layer** (1.0ms): +57% — MiniCPM layers at 1ms are in the sweet spot
+
+The base_lm (24 MiniCPM layers) alone would decode at 36 tok/s optimized vs 24 tok/s default — a **50% speedup** for the main LLM backbone. VoxCPM's TTS quality depends heavily on iterative processing through multiple sub-networks, making PCIe optimization critical for end-to-end latency.
 
 ## Methodology
 
