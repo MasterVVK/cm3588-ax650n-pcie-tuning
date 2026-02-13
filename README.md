@@ -167,6 +167,9 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% | 22.35 |
 | RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% | — |
 | IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% | 139.80 |
+| centerpoint | 3D LiDAR det | 92.92 | **92.26** | +0.7% | 88.3 |
+| bevformer | 3D BEV det | 92.58 | **92.11** | +0.5% | 91.2 |
+| MeloTTS decoder | TTS decoder | 92.6 | **92.0** | +0.7% | — |
 | LivePortrait spade | Portrait anim | 233.3 | **232.5** | +0.3% | — |
 | mel_band_roformer | Music separation | 426.3 | **425.6** | +0.2% | — |
 
@@ -209,9 +212,15 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | FG-CLIP text | CLIP text | 11.67 | **11.08** | +5% | 10.82 |
 | jina-clip-v2 image | CLIP image | 597.2 | **596.2** | +0.2% | 592.2 |
 | jina-clip-v2 text | CLIP text | 15.31 | **14.86** | +3% | 15.48 |
+| ESPCN x2 | Super-resolution | 22.71 | **22.41** | +1% | 22 |
+| CLIP ViT-L/14 text | CLIP text | 6.39 | **5.82** | +10% | — |
+| CLIP ViT-L/14 image | CLIP image | 71.11 | **70.28** | +1% | — |
+| SigLIP-so400m vision | Zero-shot img | 168.9 | **168.2** | +0.5% | — |
+| SigLIP-so400m text | Zero-shot txt | 23.51 | **22.88** | +3% | — |
 | RMBG-1.4 | Background removal | 107.2 | **106.5** | +1% | — |
 | CodeFormer | Face restoration | 444.7 | **444.1** | +0.1% | — |
 | DeOldify | Photo colorization | 383.6 | **383.0** | +0.2% | — |
+| EDSR baseline x2 | Super-resolution | 694.7 | **693.9** | +0.1% | — |
 
 ### TTS — CosyVoice3 (Russian text on NPU)
 
@@ -243,8 +252,14 @@ No AXCL aarch64 binary for end-to-end VLM; individual .axmodel components benchm
 | FastVLM-0.5B | Vision Encoder | 45.51 | **44.64** | +2% |
 | FastVLM-0.5B | LLM Layer | 1.547 | **1.170** | **+32%** |
 | FastVLM-0.5B | LLM Post | 7.538 | **7.043** | +7% |
+| SmolVLM-256M | Vision Encoder | 99.26 | **98.58** | +1% |
+| SmolVLM-256M | LLM Layer | 0.700 | **0.450** | **+56%** |
+| SmolVLM-256M | LLM Post | 2.110 | **1.582** | +33% |
+| InternVL2.5-1B | Vision Encoder | 357.8 | **357.0** | +0.2% |
+| InternVL2.5-1B | LLM Layer | 1.648 | **1.020** | **+62%** |
+| InternVL2.5-1B | LLM Post | 7.533 | **7.098** | +6% |
 
-VLM decoder layers show +32-45% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%, native: 76.7), FastVLM ~22→29 tok/s (+28%, native: 34.8).
+VLM decoder layers show +32-62% speedup — consistent with LLM pattern. Estimated decode: SmolVLM2 ~38→54 tok/s (+42%, native: 76.7), SmolVLM ~43→66 tok/s (+53%, native: 80), FastVLM ~22→29 tok/s (+28%, native: 34.8), InternVL2.5-1B ~21→32 tok/s (+52%, **matches native**: 32).
 
 ### Optimization Effect Pattern
 
@@ -257,29 +272,35 @@ The speedup correlates inversely with inference time — faster models benefit m
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | ~0.34 ms | Zipformer joiner | **+93%** |
+| ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
 | < 0.5 ms | OCR classifier | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
+| ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
 | ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
 | ~3.0 ms | Zipformer encoder | +19% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.5 ms | LivePortrait motion | +9% |
 | ~10 ms | MixFormerV2 | +3% |
 | ~13 ms | DeepLabv3Plus | +4% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~29 ms | OCR detector | +1% |
+| ~92 ms | centerpoint/bevformer/MeloTTS | +0.5-0.7% |
 | ~107 ms | RMBG-1.4 | +1% |
 | ~143 ms | IGEV++ stereo depth | ~0% |
 | ~233 ms | LivePortrait spade | +0.3% |
+| ~358 ms | InternVL2.5-1B vision | +0.2% |
 | ~445 ms | CodeFormer | +0.1% |
 | ~498 ms | DeOldify artistic | +0.2% |
+| ~694 ms | EDSR baseline x2 | +0.1% |
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-Zipformer joiner at +93% and decoder at +80% are the **highest speedups** measured for any single-inference model — beating the previous record of +71% (OCR classifier). These ultra-fast sub-millisecond ASR components are extremely sensitive to PCIe latency.
+Zipformer joiner at +93% is the highest speedup for single-inference models. VLM decoder layers consistently show +32-62%. InternVL2.5-1B optimized **matches official native speed** (32 tok/s).
 
-**110+ models tested** across 28 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, and more.
+**120+ models tested** across 29 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, 3D object detection, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

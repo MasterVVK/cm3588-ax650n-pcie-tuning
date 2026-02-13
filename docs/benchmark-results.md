@@ -618,13 +618,16 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | ~0.34 ms | Zipformer joiner | **+93%** |
+| ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
 | < 0.5 ms | OCR classifier (cls) | **+71%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
+| ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
+| ~1.6 ms | SmolVLM-256M LLM post | **+33%** |
 | ~1.6 ms | SmolVLM2-256M LLM post | +21% |
 | ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
@@ -641,13 +644,16 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~5.0 ms | YOLO26s-Seg | +12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
+| ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
+| ~7.1 ms | InternVL2.5-1B LLM post | +6% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~7.5 ms | LivePortrait motion | +9% |
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
+| ~10.4 ms | ESPCN x2 2K | +2% |
 | ~11 ms | FG-CLIP text/SigLIP2 vision | +1-5% |
 | ~12.2 ms | YOLO26l-Pose | +6% |
 | ~12.4 ms | SenseVoice streaming | +6% |
@@ -655,7 +661,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
+| ~22 ms | ESPCN x2 | +1% |
 | ~23 ms | Depth-Anything-3 small | +3% |
+| ~23 ms | SigLIP-so400m text | +3% |
 | ~24 ms | EdgeTAM image encoder | +1% |
 | ~26 ms | YOLO26x-Pose | +3% |
 | ~28 ms | SuperPoint | +1% |
@@ -667,28 +675,34 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~55 ms | SenseVoice (full) | +1% |
 | ~65 ms | MobileCLIP2-S4 image | +1% |
 | ~68 ms | Depth-Anything-3 base | +1% |
+| ~70 ms | CLIP ViT-L/14 image | +1% |
 | ~89 ms | LibCLIP cnclip vision | +0.8% |
-| ~99 ms | SmolVLM2-256M vision encoder | +1% |
+| ~92 ms | centerpoint/bevformer/MeloTTS | +0.5-0.7% |
+| ~99 ms | SmolVLM2/SmolVLM-256M vision | +0.7-1% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~129 ms | FG-CLIP image encoder | +0.4% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
+| ~168 ms | SigLIP-so400m vision | +0.5% |
 | ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
 | ~233 ms | LivePortrait spade | +0.3% |
+| ~309 ms | EDSR baseline x2 2K | +0.2% |
+| ~357 ms | InternVL2.5-1B vision | +0.2% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
 | ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
 | ~498 ms | DeOldify artistic | +0.2% |
 | ~597 ms | jina-clip-v2 image encoder | +0.2% |
+| ~694 ms | EDSR baseline x2 | +0.1% |
 
 **Why?** Each NPU inference involves PCIe round-trip overhead (~0.3ms for IRQ handling + data transfer). For fast models, this overhead is a significant fraction of total time. Moving IRQ to a faster CPU core (A76 @ 2.3 GHz vs A55 @ 1.8 GHz) reduces this overhead, and the `performance` governor eliminates frequency scaling delays between calls.
 
-For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-45% improvement — consistent with the LLM pattern.
+For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-62% improvement — consistent with the LLM pattern.
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**110+ models tested** across 28 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families. Portrait animation (LivePortrait) and streaming ASR (Zipformer) provide additional extreme data points.
+**120+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 4 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1014,6 +1028,155 @@ CLIP models clearly demonstrate the optimization pattern: text encoders (5-15ms)
 
 At 426ms, mel_band_roformer is fully compute-bound — PCIe optimization has negligible effect. This model separates music into stems (bass, drums, vocals). Processing is offline (not real-time), so absolute speed matters more than latency consistency.
 
+## Super-Resolution — EDSR & ESPCN
+
+### Test Configuration
+
+- **Models**: [SuperResolution](https://huggingface.co/AXERA-TECH/SuperResolution) — EDSR baseline and ESPCN (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 10 warmup (EDSR: 50 iterations, 5 warmup)
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Official (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| ESPCN x2 | 22.705 | **22.411** | +1.3% | ~22 |
+| ESPCN x2 2K | 10.664 | **10.418** | +2.4% | — |
+| EDSR baseline x2 | 694.676 | **693.932** | +0.1% | ~800 |
+| EDSR baseline x2 2K | 309.991 | **309.312** | +0.2% | — |
+
+### Analysis
+
+ESPCN is a lightweight SR model (~22ms) showing modest optimization benefit (+1-2%). EDSR at 694ms is heavily compute-bound (+0.1%). The "2K" variants use a different input resolution. EDSR official number (~800ms) is from Python pyaxengine, which adds runtime overhead — our C++ axcl_run_model is ~13% faster.
+
+## 3D Object Detection — CenterPoint & BEVFormer
+
+### Test Configuration
+
+- **Models**: [CenterPoint](https://huggingface.co/AXERA-TECH/centerpoint) (3D LiDAR) and [BEVFormer](https://huggingface.co/AXERA-TECH/bevformer) (multi-camera BEV) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native NPU3 (ms) |
+|-------|------------------:|--------------------:|--------:|------------------:|
+| CenterPoint-Pillar | 92.915 | **92.263** | +0.7% | 88.334 |
+| BEVFormer-Tiny | 92.581 | **92.112** | +0.5% | 91.209 |
+
+### Analysis
+
+Both autonomous driving models are compute-bound at ~92ms. CenterPoint PCIe overhead: 4.4% vs native. BEVFormer: 1.0% overhead — remarkable given PCIe Gen2 x1 limitation. These models run at ~11 FPS, suitable for autonomous driving data processing.
+
+## TTS — MeloTTS Decoder
+
+### Test Configuration
+
+- **Models**: [MeloTTS](https://huggingface.co/AXERA-TECH/MeloTTS) decoder (zh, en, jp variants) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 50 iterations, 5 warmup
+- **Note**: MeloTTS has encoder (runs on ONNX) + decoder (on NPU). Only decoder benchmarked.
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| decoder-zh (Chinese) | 92.497 | **91.977** | +0.6% |
+| decoder-en (English) | 92.732 | **92.115** | +0.7% |
+| decoder-jp (Japanese) | 92.643 | **92.023** | +0.7% |
+
+### Analysis
+
+All MeloTTS decoders have nearly identical inference time (~92ms) — the decoder architecture is the same, only weights differ. At this latency, optimization has negligible effect (+0.7%). Official RTF: 0.125 (8x real-time on native AX650). Via PCIe, the decoder alone adds ~92ms per chunk.
+
+## CLIP — OpenAI ViT-L/14-336px
+
+### Test Configuration
+
+- **Models**: [CLIP ViT-L/14-336px](https://huggingface.co/AXERA-TECH/clip) (OpenAI, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 50 iterations (text), 20 iterations (image), 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Text encoder | 6.386 | **5.821** | +9.7% |
+| Image encoder | 71.108 | **70.283** | +1.2% |
+
+### Analysis
+
+CLIP text encoder at ~6ms benefits from optimization (+10%), consistent with the text-encoder pattern seen in SigLIP2, LibCLIP, and FG-CLIP. Image encoder at ~71ms is compute-bound with minimal benefit. This is the original OpenAI CLIP ViT-L/14 at 336px resolution.
+
+## Zero-Shot — SigLIP-so400m-patch14-384
+
+### Test Configuration
+
+- **Models**: [siglip-so400m-patch14-384](https://huggingface.co/AXERA-TECH/siglip-so400m-patch14-384) (Google SigLIP 400M, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Vision encoder (384x384) | 168.935 | **168.173** | +0.5% |
+| Text encoder | 23.512 | **22.882** | +2.8% |
+
+### Analysis
+
+SigLIP-so400m is a much larger model than the previously tested SigLIP2-base (168ms vs 11ms for vision, 23ms vs 5ms for text). The vision encoder is heavily compute-bound. Text encoder shows +2.8% — lower than CLIP ViT-L/14 text (+10%) because it's 4x slower (23ms vs 6ms), making PCIe overhead a smaller fraction.
+
+## VLM — SmolVLM-256M-Instruct (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [SmolVLM-256M-Instruct](https://huggingface.co/AXERA-TECH/SmolVLM-256M-Instruct) (HuggingFace, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Note**: Non-video version of SmolVLM2-256M. Same architecture: 30 LLM layers + vision encoder.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision Encoder | 99.263 | **98.577** | +0.7% |
+| LLM Decoder Layer | 0.700 | **0.450** | **+55.6%** |
+| LLM Post | 2.110 | **1.582** | +33.4% |
+
+Estimated decode speed (30 layers + post):
+- Default: ~43 tok/s (30×0.700 + 2.110 ≈ 23.1 ms/tok)
+- Optimized: ~66 tok/s (30×0.450 + 1.582 ≈ 15.1 ms/tok)
+- Native: 80 tok/s
+
+### Analysis
+
+SmolVLM-256M (non-video) shows +56% on LLM layers — higher than SmolVLM2-256M (+45%). The smaller layer size (4.0MB vs 4.1MB) means even faster inference (0.45ms vs 0.57ms optimized), making PCIe overhead a larger fraction. Optimized reaches 83% of native speed.
+
+## VLM — InternVL2.5-1B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL2.5-1B](https://huggingface.co/AXERA-TECH/InternVL2_5-1B) (OpenGVLab, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Note**: 24 Qwen2 LLM layers, ViT vision encoder. Official native: 32 tok/s.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision Encoder (448x448) | 357.773 | **356.981** | +0.2% |
+| LLM Decoder Layer (Qwen2) | 1.648 | **1.020** | **+61.6%** |
+| LLM Post | 7.533 | **7.098** | +6.1% |
+
+Estimated decode speed (24 layers + post):
+- Default: ~21 tok/s (24×1.648 + 7.533 ≈ 47.1 ms/tok)
+- Optimized: ~32 tok/s (24×1.020 + 7.098 ≈ 31.6 ms/tok)
+- **Native: 32 tok/s** — optimization eliminates PCIe overhead!
+
+### Analysis
+
+InternVL2.5-1B is the first VLM where optimized performance **matches official native speed** (32 tok/s). The 1B Qwen2 LLM layers at 1.0ms are in the sweet spot where optimization (+62%) maximally reduces PCIe overhead. Vision encoder at 358ms is fully compute-bound. This demonstrates that for compute-heavy LLM layers (~1ms per layer), optimization can completely compensate for PCIe Gen2 x1 bandwidth limitation.
+
 ## Portrait Animation — LivePortrait
 
 ### Test Configuration
@@ -1059,7 +1222,7 @@ The full LivePortrait pipeline (feature + motion + spade + stitching) takes ~260
 
 ### Analysis
 
-Zipformer joiner at **+93%** is the **absolute record speedup** measured across all 110+ models — beating the previous record of +71% (OCR classifier). The decoder at +80% is the second highest.
+Zipformer joiner at **+93%** is the **absolute record speedup** measured across all 120+ models — beating the previous record of +71% (OCR classifier). The decoder at +80% is the second highest.
 
 Both joiner and decoder are ultra-fast sub-millisecond models where PCIe round-trip latency (~0.3ms) is a massive fraction of total time. Moving IRQ from slow A55 to fast A76 nearly halves the overhead.
 
