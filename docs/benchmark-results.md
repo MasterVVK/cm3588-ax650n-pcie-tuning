@@ -314,6 +314,16 @@ These experiments were conducted to test whether PCIe register tuning could impr
 | YOLOv8s-Pose | Pose | 11.812 | **11.259** | +4.7% | 89 |
 | Depth-Anything-V2-S | Depth | 33.994 | **33.443** | +1.6% | 30 |
 
+### YOLO26-Det (NPU 3-core, 640x640)
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS | Native (ms) |
+|-------|------------------:|--------------------:|--------:|--------------:|------------:|
+| YOLO26n-Det | 2.152 | **1.786** | +20.5% | 560 | 1.378 |
+| YOLO26s-Det | 3.957 | **3.572** | +10.8% | 280 | 3.166 |
+| YOLO26m-Det | 9.309 | **8.974** | +3.7% | 111 | 8.644 |
+| YOLO26l-Det | 11.910 | **11.736** | +1.5% | 85 | 11.174 |
+| YOLO26x-Det | 25.453 | **25.042** | +1.6% | 40 | 20.405 |
+
 ### YOLO26-Pose (NPU 3-core, 640x640)
 
 | Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS | Native (ms) |
@@ -466,6 +476,8 @@ This confirms the optimization specifically targets NPU inference workloads.
 | Model | Task | Input | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
 |-------|------|-------|------------------:|--------------------:|--------:|--------------:|
 | det_10g | Face Detection | 640x640 | 7.356 | **6.862** | +7.2% | 146 |
+| 1k3d68 | 3D Landmarks | 192x192 | 3.045 | **2.639** | +15.4% | 379 |
+| 2d106det | 2D Landmarks | 192x192 | 0.861 | **0.717** | +20.1% | 1395 |
 | genderage | Gender/Age | 96x96 | 0.479 | **0.357** | +34.2% | 2801 |
 | w600k_r50 | Face Embedding | 112x112 | 4.265 | **3.717** | +14.7% | 269 |
 
@@ -607,6 +619,33 @@ CosyVoice3 TTS optimization effect is moderate (+17% LLM decode) because:
 - Token2Wav (ODE solver with 7 steps of ~100ms each) dominates total time and shows minimal benefit
 - RTF > 1.0 means slower than real-time on PCIe Gen2 x1
 
+## TTS — Kokoro
+
+### Test Configuration
+
+- **Models**: [kokoro.axera](https://huggingface.co/AXERA-TECH/kokoro.axera) — 3-part TTS pipeline (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 20 iterations (Part1, Part3), 100 iterations (Part2), 3 warmup
+- **Note**: Full pipeline also includes ONNX model4 (harmonic simulator, runs on CPU). Only NPU parts benchmarked.
+
+### With vs Without Optimization
+
+| Model | CMM (MB) | Default avg (ms) | Optimized avg (ms) | Speedup | Native* (ms) |
+|-------|:--------:|------------------:|--------------------:|--------:|-------------:|
+| Part1 (encoder) | 87 | 17.573 | **16.829** | +4.4% | 22.1 |
+| Part2 (decoder) | 22 | 9.958 | **9.655** | +3.1% | 17.4 |
+| Part3 (vocoder) | 118 | 189.967 | **189.508** | +0.2% | 185.3 |
+
+*Native numbers from Python pyaxengine (includes Python runtime overhead ~5-8ms). Part1 and Part2 are faster via C++ axcl_run_model than native Python.*
+
+### Analysis
+
+Kokoro TTS is a 3-part pipeline with RTF ~0.07 on native AX650N (14x real-time). Via PCIe:
+- Part3 (vocoder, 190ms) dominates pipeline time and is fully compute-bound (+0.2%)
+- Part1 (encoder, 17ms) and Part2 (decoder, 10ms) show modest benefit (+3-4%)
+- Total NPU time: ~216ms per inference (vs ~225ms native Python) — C++ runtime is actually faster than native Python for light models
+- PCIe overhead visible only on Part3: +2.3% vs native (189.5 vs 185.3ms)
+
 ## Optimization Effect Pattern
 
 The speedup from PCIe optimization correlates inversely with inference time:
@@ -622,25 +661,30 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
 | < 0.5 ms | OCR classifier cls (npu1) | **+71%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
-| ~0.7 ms | MobileNetV2 | **+50%** |
+| ~0.7 ms | MobileNetV2/Insightface 2d106det | **+20-50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
 | ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
+| ~1.5 ms | InternVL3.5-1B LLM layer (Qwen3) | **+26%** |
 | ~1.6 ms | SmolVLM-256M LLM post | **+33%** |
 | ~1.6 ms | SmolVLM2-256M LLM post | +21% |
 | ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.7 ms | PPOCR_v5 rec (npu3) | **+18%** |
+| ~1.8 ms | YOLO26n-Det | **+21%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
+| ~2.6 ms | Insightface 1k3d68 (3D landmarks) | +15% |
+| ~2.7 ms | FastVLM-1.5B LLM layer | +16% |
 | ~3.0 ms | Zipformer encoder | +19% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
+| ~3.2 ms | Qwen3-VL-2B LLM layer | +9% |
 | ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
 | ~3.5 ms | ResNet50 | +8% |
-| ~3.6 ms | YOLO11s/QR YOLO26n/YOLO11n | +2-12% |
+| ~3.6 ms | YOLO11s/YOLO26s-Det/QR YOLO26n/YOLO11n | +2-12% |
 | ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
@@ -649,41 +693,50 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~4.6 ms | LibCLIP cnclip text | +10% |
 | ~4.7 ms | YOLO11s-Seg | +2% |
 | ~5.0 ms | YOLO26s-Seg/YOLOv8s-Seg | +4-12% |
+| ~5.3 ms | MiniCPM-V-4 LLM layer (LLaMA) | +12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
+| ~5.8 ms | SileroVAD | +9% |
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7.0 ms | InternVL3-1B/InternVL2.5-1B LLM post | +6-8% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~7.5 ms | LivePortrait motion | +9% |
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
-| ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
+| ~8.1 ms | InternVL3.5-1B LLM post | +5% |
+| ~9 ms | RT-DETR/YOLO-World YOLO/YOLO26m-Det | +2-5% |
+| ~9.2 ms | MiniCPM-V-4 LLM post | +3% |
+| ~9.7 ms | Kokoro Part2 (TTS decoder) | +3% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
 | ~10 ms | YOLOv5s-Seg | +2% |
 | ~10.4 ms | Janus-Pro-1B LLM post | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
+| ~11.5 ms | FastVLM-1.5B LLM post | +7% |
 | ~10.4 ms | ESPCN x2 2K | +2% |
 | ~11.3 ms | YOLOv8s-Pose | +0.2% |
 | ~11 ms | FG-CLIP text/SigLIP2 vision | +1-5% |
+| ~11.7 ms | YOLO26l-Det | +1% |
 | ~12.2 ms | YOLO26l-Pose | +6% |
 | ~12.4 ms | SenseVoice streaming | +6% |
 | ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
+| ~15.7 ms | Qwen3-VL-2B LLM post | +2% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
+| ~17 ms | Kokoro Part1 (TTS encoder) | +4% |
 | ~18 ms | PPOCR_v5 det (npu3) | +4% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~22 ms | ESPCN x2 | +1% |
 | ~23 ms | Depth-Anything-3 small | +3% |
 | ~23 ms | SigLIP-so400m text | +3% |
-| ~24 ms | EdgeTAM image encoder | +1% |
+| ~24 ms | FireRedASR decoder/EdgeTAM image encoder | +1-3% |
 | ~25 ms | YOLO11x/YOLO11x-Pose | +0.4-3% |
-| ~26 ms | YOLO26x-Pose | +3% |
+| ~25 ms | YOLO26x-Det/YOLO26x-Pose | +2-3% |
 | ~28 ms | SuperPoint | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
 | ~35 ms | YOLO11x-Seg/bge-small-en | +1-2% |
 | ~37 ms | YOLO26x-Seg | +2% |
 | ~43 ms | DEIMv2 DINOv3-S | +1% |
-| ~45 ms | FastVLM-0.5B vision encoder | +2% |
+| ~45 ms | FastVLM-0.5B/1.5B vision encoder | +1-2% |
 | ~51 ms | MobileSAM encoder | +1% |
 | ~55 ms | SenseVoice (full) | +1% |
 | ~65 ms | MobileCLIP2-S4 image | +1% |
@@ -697,15 +750,19 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
 | ~129 ms | FG-CLIP image encoder | +0.4% |
 | ~143 ms | Janus-Pro-1B vision/IGEV++ | ~0-0.5% |
+| ~158 ms | Qwen3-VL-2B vision | +0.4% |
+| ~162 ms | FireRedASR encoder | +0.5% |
 | ~168 ms | SigLIP-so400m vision | +0.5% |
+| ~190 ms | Kokoro Part3 (TTS vocoder) | +0.2% |
 | ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
 | ~233 ms | LivePortrait spade | +0.3% |
 | ~309 ms | EDSR baseline x2 2K | +0.2% |
-| ~357 ms | InternVL2.5-1B/InternVL3-1B vision | +0.2% |
+| ~357 ms | InternVL2.5-1B/InternVL3-1B/InternVL3.5-1B vision | +0.1-0.2% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
 | ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
+| ~581 ms | MiniCPM-V-4 SigLIP vision | +0.1% |
 | ~498 ms | DeOldify artistic | +0.2% |
 | ~597 ms | jina-clip-v2 image encoder | +0.2% |
 | ~694 ms | EDSR baseline x2 | +0.1% |
@@ -716,7 +773,7 @@ For LLM inference, the effect is even more dramatic (+50-100%) because each toke
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**140+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 6 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5, InternVL3, Janus-Pro). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
+**170+ models tested** across 35+ categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 10 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, MiniCPM-V-4). Portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, TTS (CosyVoice3, Kokoro, MeloTTS), and VAD provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1305,6 +1362,149 @@ Janus-Pro-1B has larger LLM layers (~3.4ms) compared to InternVL (1ms), resultin
 ### Analysis
 
 InternVL3-1B shows very similar performance to InternVL2.5-1B (both use 24 Qwen2 layers). Layer speedup +54% vs +62% — slightly less due to marginally larger layers (1.14ms vs 1.02ms). Both generations reach ~29-32 tok/s optimized. The vision encoder is slightly larger (365ms vs 358ms) but equally compute-bound.
+
+## VLM — InternVL3.5-1B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL3_5-1B](https://huggingface.co/AXERA-TECH/InternVL3_5-1B) — InternVL 3.5 generation, 28 Qwen3 layers + post + InternViT vision encoder
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 20 iterations (post), 10 iterations (vision), 3-5 warmup
+- **Note**: Official native: 21.60 tok/s
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (448x448) | 365.917 | **365.409** | +0.1% |
+| LLM Layer (Qwen3 l0) | 1.915 | **1.526** | **+25.5%** |
+| LLM Post | 8.512 | **8.134** | +4.7% |
+
+### Estimated Decode Speed
+
+- Default: ~19 tok/s (28×1.915 + 8.512 ≈ 62.1 ms/tok)
+- Optimized: ~20 tok/s (28×1.526 + 8.134 ≈ 50.9 ms/tok)
+- **Native: 21.60 tok/s** — optimization reaches 91% of native
+
+### Analysis
+
+InternVL3.5-1B uses Qwen3 architecture (vs Qwen2 in InternVL3-1B), with 28 layers instead of 24. The layer speedup (+25.5%) is lower than InternVL3-1B (+54%) because Qwen3 layers are larger (1.5ms vs 1.1ms). The vision encoder reuses InternViT (365ms, identical to InternVL3-1B). Optimized decode speed reaches **91% of native** (20 vs 21.6 tok/s).
+
+## VLM — Qwen3-VL-2B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [Qwen3-VL-2B-Instruct](https://huggingface.co/AXERA-TECH/Qwen3-VL-2B-Instruct) — Alibaba Qwen3 vision-language, 28 layers + post + vision encoder (W8A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+- **Note**: Official native: 9.5 tok/s, CMM 4.1 GiB
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision encoder | 158.200 | **157.564** | +0.4% |
+| LLM Layer (Qwen3 l0) | 3.489 | **3.214** | +8.6% |
+| LLM Post | 16.005 | **15.746** | +1.6% |
+
+### Estimated Decode Speed
+
+- Default: ~9 tok/s (28×3.489 + 16.005 ≈ 113.7 ms/tok)
+- Optimized: ~9.5 tok/s (28×3.214 + 15.746 ≈ 105.7 ms/tok)
+- **Native: 9.5 tok/s** — optimization **fully eliminates PCIe overhead!**
+
+### Analysis
+
+Qwen3-VL-2B is the first model where optimized PCIe speed **exactly matches** official native speed (9.5 tok/s). The LLM layers at 3.2ms are large enough to be compute-bound, with only 8.6% PCIe overhead per layer. The 28-layer architecture means the overhead is well-amortized. Vision encoder at 158ms is fully compute-bound.
+
+## VLM — FastVLM-1.5B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [FastVLM-1.5B](https://huggingface.co/AXERA-TECH/FastVLM-1.5B) — Apple FastVLM 1.5B, 28 Qwen2 layers + post + image encoder (W8A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+- **Note**: Official native: 11.53 tok/s, vision 512=58.56ms, 1024=231.07ms
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision (512x512) | 45.380 | **44.974** | +0.9% |
+| LLM Layer (Qwen2 l0) | 3.175 | **2.739** | +15.9% |
+| LLM Post | 12.292 | **11.528** | +6.6% |
+
+### Estimated Decode Speed
+
+- Default: ~10 tok/s (28×3.175 + 12.292 ≈ 101.2 ms/tok)
+- Optimized: ~11.3 tok/s (28×2.739 + 11.528 ≈ 88.2 ms/tok)
+- **Native: 11.53 tok/s** — optimization reaches **98% of native**
+
+### Analysis
+
+FastVLM-1.5B is the larger variant of FastVLM-0.5B (28 vs 24 layers, Qwen2 vs Qwen2). Layer speedup (+16%) is lower than FastVLM-0.5B (+32%) due to larger layers (2.7ms vs 1.2ms). Vision encoder (512x512) at 45ms shows minimal benefit. The optimized speed reaches 98% of native — practically no PCIe penalty. Note: Our C++ vision measurement (45ms) is faster than official Python (58.56ms) due to Python runtime overhead.
+
+## VLM — MiniCPM-V-4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [MiniCPM-V-4](https://huggingface.co/AXERA-TECH/MiniCPM-V-4) — OpenBMB MiniCPM-V 4th gen, 32 LLaMA layers + post + SigLIP vision encoder
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| SigLIP vision | 581.429 | **580.968** | +0.1% |
+| LLM Layer (LLaMA l0) | 5.914 | **5.280** | +12.0% |
+| LLM Post | 9.531 | **9.241** | +3.1% |
+
+### Estimated Decode Speed
+
+- Default: ~5 tok/s (32×5.914 + 9.531 ≈ 198.8 ms/tok)
+- Optimized: ~5.6 tok/s (32×5.280 + 9.241 ≈ 178.2 ms/tok)
+
+### Analysis
+
+MiniCPM-V-4 has the largest LLM layers tested (5.3ms, LLaMA architecture), resulting in moderate optimization benefit (+12%). The SigLIP vision encoder at 581ms is the heaviest VLM encoder measured — fully compute-bound. 32 layers make this a heavy model with ~178ms/tok decode time. MiniCPM-V-4 is a multimodal model supporting image, video, and document understanding.
+
+## ASR — FireRedASR-AED
+
+### Test Configuration
+
+- **Models**: [FireRedASR-AED](https://huggingface.co/AXERA-TECH/FireRedASR-AED) — Xiaohongshu ASR AED-L model, encoder + decoder (Chinese/English, max 10s audio)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| Encoder (813M) | 162.220 | **161.491** | +0.5% |
+| Decoder loop (397M) | 24.597 | **23.929** | +2.8% |
+
+### Analysis
+
+FireRedASR encoder at 161ms is compute-bound (+0.5%). The decoder at 24ms shows modest benefit (+2.8%). Both models are large (813M + 397M = 1.2GB total), using significant CMM (~1.3 GiB combined). This is a full-featured ASR model supporting Chinese and English with up to 10s audio input.
+
+## Voice Activity Detection — SileroVAD
+
+### Test Configuration
+
+- **Models**: [SileroVAD](https://huggingface.co/AXERA-TECH/Spoken-Communication.axera) VAD component (1.1M model)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Optimized FPS |
+|-------|------------------:|--------------------:|--------:|--------------:|
+| SileroVAD | 6.332 | **5.821** | +8.8% | 172 |
+
+### Analysis
+
+SileroVAD at 5.8ms shows +8.8% optimization benefit — consistent with models in the 5-7ms latency range. At 172 inferences/sec, it can process audio frames much faster than real-time. This is a critical component in voice pipelines for detecting speech segments before sending to ASR.
 
 ## CLIP — cnclip ViT-L/14-336px (Chinese CLIP)
 
