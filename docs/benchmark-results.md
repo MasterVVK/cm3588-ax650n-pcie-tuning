@@ -613,8 +613,11 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 | Inference time | Model | Speedup |
 |:-:|:-:|:-:|
+| ~0.20 ms | LivePortrait stitching | **+57%** |
+| ~0.24 ms | Zipformer decoder | **+80%** |
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
+| ~0.34 ms | Zipformer joiner | **+93%** |
 | < 0.5 ms | OCR classifier (cls) | **+71%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
@@ -627,18 +630,20 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
+| ~3.0 ms | Zipformer encoder | +19% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
-| ~5.0 ms | YOLO26s-Seg | +12% |
 | ~4.6 ms | LibCLIP cnclip text | +10% |
+| ~5.0 ms | YOLO26s-Seg | +12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
+| ~7.5 ms | LivePortrait motion | +9% |
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
@@ -648,14 +653,15 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~12.4 ms | SenseVoice streaming | +6% |
 | ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
+| ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~23 ms | Depth-Anything-3 small | +3% |
 | ~24 ms | EdgeTAM image encoder | +1% |
 | ~26 ms | YOLO26x-Pose | +3% |
 | ~28 ms | SuperPoint | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
-| ~43 ms | DEIMv2 DINOv3-S | +1% |
 | ~37 ms | YOLO26x-Seg | +2% |
+| ~43 ms | DEIMv2 DINOv3-S | +1% |
 | ~45 ms | FastVLM-0.5B vision encoder | +2% |
 | ~51 ms | MobileSAM encoder | +1% |
 | ~55 ms | SenseVoice (full) | +1% |
@@ -665,13 +671,14 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~99 ms | SmolVLM2-256M vision encoder | +1% |
 | ~107 ms | RMBG-1.4 (background removal) | +1% |
 | ~113 ms | RAFT-stereo 384x1280 | ~0% |
+| ~129 ms | FG-CLIP image encoder | +0.4% |
 | ~143 ms | IGEV++ (RTIGEV) | ~0% |
 | ~210 ms | RIFE x2 720p (frame interp) | +0.4% |
-| ~129 ms | FG-CLIP image encoder | +0.4% |
+| ~233 ms | LivePortrait spade | +0.3% |
 | ~383 ms | DeOldify (colorization) | +0.2% |
+| ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
-| ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~498 ms | DeOldify artistic | +0.2% |
 | ~597 ms | jina-clip-v2 image encoder | +0.2% |
 
@@ -679,7 +686,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 
 For LLM inference, the effect is even more dramatic (+50-100%) because each token requires hundreds of sequential small NPU calls, each incurring PCIe overhead. Smaller, more efficient LLM architectures (MiniCPM4, SmolLM2) show the highest gains. VLM decoder layers show +32-45% improvement — consistent with the LLM pattern.
 
-**100+ models tested** across 27 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families.
+Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
+
+**110+ models tested** across 28 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 2 more model families. Portrait animation (LivePortrait) and streaming ASR (Zipformer) provide additional extreme data points.
 
 ## Stereo Depth Estimation
 
@@ -1004,6 +1013,59 @@ CLIP models clearly demonstrate the optimization pattern: text encoders (5-15ms)
 ### Analysis
 
 At 426ms, mel_band_roformer is fully compute-bound — PCIe optimization has negligible effect. This model separates music into stems (bass, drums, vocals). Processing is offline (not real-time), so absolute speed matters more than latency consistency.
+
+## Portrait Animation — LivePortrait
+
+### Test Configuration
+
+- **Models**: [LivePortrait](https://huggingface.co/AXERA-TECH/LivePortrait) — 4 components (feature extractor, motion extractor, spade generator, stitching/retargeting) (pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| stitching_retargeting | 0.311 | **0.198** | **+57.1%** |
+| motion_extractor | 8.177 | **7.472** | +9.4% |
+| feature_extractor | 20.364 | **19.866** | +2.5% |
+| spade_generator | 233.282 | **232.544** | +0.3% |
+
+### Analysis
+
+LivePortrait components span a 1000x range of inference times (0.2ms to 233ms), providing an excellent demonstration of the optimization pattern:
+- **stitching** (0.2ms): **+57%** — the tiny stitching network is extremely PCIe-latency-sensitive
+- **motion** (7.5ms): +9% — moderate benefit
+- **feature** (20ms): +3% — approaching compute-bound territory
+- **spade** (233ms): +0.3% — fully compute-bound, the heavy generator dominates
+
+The full LivePortrait pipeline (feature + motion + spade + stitching) takes ~260ms per frame (~4 FPS) via PCIe. The spade generator dominates total time.
+
+## ASR — Zipformer
+
+### Test Configuration
+
+- **Models**: [Zipformer.axera](https://huggingface.co/AXERA-TECH/Zipformer.axera) — encoder, decoder, joiner (Kaldi/icefall architecture, pre-compiled for AX650)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| joiner | 0.664 | **0.344** | **+93.0%** |
+| decoder | 0.437 | **0.243** | **+79.8%** |
+| encoder | 3.602 | **3.018** | +19.4% |
+
+### Analysis
+
+Zipformer joiner at **+93%** is the **absolute record speedup** measured across all 110+ models — beating the previous record of +71% (OCR classifier). The decoder at +80% is the second highest.
+
+Both joiner and decoder are ultra-fast sub-millisecond models where PCIe round-trip latency (~0.3ms) is a massive fraction of total time. Moving IRQ from slow A55 to fast A76 nearly halves the overhead.
+
+The encoder at 3ms shows +19% — still a strong benefit, consistent with other models in this latency range.
+
+For streaming ASR, the joiner and decoder are called once per frame (typically every 60ms), so the absolute time savings (~0.3ms + ~0.2ms per frame) are meaningful for low-latency applications.
 
 ## Methodology
 

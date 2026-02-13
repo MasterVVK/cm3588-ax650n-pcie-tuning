@@ -150,20 +150,24 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | genderage | Gender/Age | 0.479 | **0.357** | +34% | 2801 | 0.30 |
 | w600k_r50 | Embedding | 4.27 | **3.72** | +15% | 269 | 3.99 |
 
-### Stereo Depth, Video Segmentation, Speaker ID, Audio
+### Stereo Depth, Video Segmentation, Speaker ID, Audio, Portrait Animation
 
 | Model | Task | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
 |-------|------|----------:|------------:|--------:|------------:|
+| LivePortrait stitching | Portrait anim | 0.311 | **0.198** | **+57%** | — |
 | EdgeTAM prompt enc | Video seg | 0.297 | **0.270** | +10% | 0.06 |
 | EdgeTAM prompt mask | Video seg | 0.765 | **0.732** | +4% | 0.46 |
 | gtcrn | Audio denoise | 1.607 | **1.434** | +12% | — |
 | 3D-Speaker ECAPA-TDNN | Speaker ID | 4.006 | **3.889** | +3% | — |
 | EdgeTAM mask decoder | Video seg | 5.338 | **5.184** | +3% | 4.73 |
 | 3D-Speaker Res2NetV2 | Speaker ID | 5.534 | **5.459** | +1% | 5.09 |
+| LivePortrait motion | Portrait anim | 8.177 | **7.472** | +9% | — |
+| LivePortrait feature | Portrait anim | 20.36 | **19.87** | +3% | — |
 | RAFT-stereo 256x640 | Stereo depth | 21.19 | **21.28** | ~0% | 20.9 |
 | EdgeTAM image encoder | Video seg | 23.88 | **23.73** | +1% | 22.35 |
 | RAFT-stereo 384x1280 | Stereo depth | 112.55 | **112.40** | ~0% | — |
 | IGEV++ (RTIGEV) | Stereo depth | 143.40 | **143.06** | ~0% | 139.80 |
+| LivePortrait spade | Portrait anim | 233.3 | **232.5** | +0.3% | — |
 | mel_band_roformer | Music separation | 426.3 | **425.6** | +0.2% | — |
 
 ### Tracking, Segmentation, Keypoints, QR Detection
@@ -192,6 +196,9 @@ Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-9
 | YOLO-World | Detection | 9.71 | **9.25** | +5% | — |
 | Whisper-tiny enc | Speech-to-text | 21.27 | **21.13** | +1% | — |
 | Whisper-tiny dec | Speech-to-text | 4.05 | **3.93** | +3% | — |
+| Zipformer joiner | ASR | 0.664 | **0.344** | **+93%** | — |
+| Zipformer decoder | ASR | 0.437 | **0.243** | **+80%** | — |
+| Zipformer encoder | ASR | 3.602 | **3.018** | +19% | — |
 | SenseVoice stream | ASR (5 langs) | 13.11 | **12.37** | +6% | — |
 | SenseVoice full | ASR (5 langs) | 55.33 | **54.69** | +1% | — |
 | MobileCLIP2-S0 | CLIP image | 8.63 | **8.49** | +2% | — |
@@ -245,25 +252,34 @@ The speedup correlates inversely with inference time — faster models benefit m
 
 | Inference time | Example | Speedup |
 |:-:|:-:|:-:|
+| ~0.20 ms | LivePortrait stitching | **+57%** |
+| ~0.24 ms | Zipformer decoder | **+80%** |
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
+| ~0.34 ms | Zipformer joiner | **+93%** |
 | < 0.5 ms | OCR classifier | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
+| ~3.0 ms | Zipformer encoder | +19% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~7.5 ms | LivePortrait motion | +9% |
 | ~10 ms | MixFormerV2 | +3% |
 | ~13 ms | DeepLabv3Plus | +4% |
+| ~20 ms | LivePortrait feature | +3% |
 | ~29 ms | OCR detector | +1% |
 | ~107 ms | RMBG-1.4 | +1% |
 | ~143 ms | IGEV++ stereo depth | ~0% |
+| ~233 ms | LivePortrait spade | +0.3% |
 | ~445 ms | CodeFormer | +0.1% |
 | ~498 ms | DeOldify artistic | +0.2% |
 
 This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total time for fast models.
 
-**100+ models tested** across 27 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, and more.
+Zipformer joiner at +93% and decoder at +80% are the **highest speedups** measured for any single-inference model — beating the previous record of +71% (OCR classifier). These ultra-fast sub-millisecond ASR components are extremely sensitive to PCIe latency.
+
+**110+ models tested** across 28 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 
@@ -289,7 +305,7 @@ While the PCIe width cannot be changed (hardware limitation), the software-side 
 - **IRQ routing**: Linux defaults to CPU0 (A55 @ 1.8 GHz) for MSI interrupts. Moving to CPU4 (A76 @ 2.3 GHz) reduces interrupt handling latency by ~30%.
 - **CPU governor**: The `schedutil` governor aggressively scales down frequency during idle periods between token generations. `performance` governor maintains peak frequency.
 
-Combined effect: **+50-100% decode throughput, +25-40% prefill speed** depending on model. Up to +100% on MiniCPM4-0.5B, +95% on DeepSeek-R1-1.5B, +50% on Qwen3-0.6B/1.7B.
+Combined effect: **+50-100% decode throughput, +25-40% prefill speed** depending on model. Up to +100% on MiniCPM4-0.5B, +95% on DeepSeek-R1-1.5B, +50% on Qwen3-0.6B/1.7B. For ultra-fast sub-millisecond models (Zipformer ASR), speedups reach **+93%**.
 
 See [PCIe Architecture Analysis](docs/pcie-analysis.md) for the full technical deep-dive.
 

@@ -146,20 +146,24 @@ YOLO26 nano 模型：**+22%** — 视觉模型中最高加速。完整 n/s/m/l/x
 | genderage | 性别/年龄 | 0.479 | **0.357** | +34% | 2801 | 0.30 |
 | w600k_r50 | 特征提取 | 4.27 | **3.72** | +15% | 269 | 3.99 |
 
-### 立体深度、视频分割、说话人识别、音频
+### 立体深度、视频分割、说话人识别、音频、肖像动画
 
 | 模型 | 任务 | 默认 (ms) | 优化后 (ms) | 提升 | Native (ms) |
 |------|------|-------:|--------:|-----:|------------:|
+| LivePortrait stitching | 肖像动画 | 0.311 | **0.198** | **+57%** | — |
 | EdgeTAM prompt enc | 视频分割 | 0.297 | **0.270** | +10% | 0.06 |
 | EdgeTAM prompt mask | 视频分割 | 0.765 | **0.732** | +4% | 0.46 |
 | gtcrn | 音频降噪 | 1.607 | **1.434** | +12% | — |
 | 3D-Speaker ECAPA-TDNN | 说话人识别 | 4.006 | **3.889** | +3% | — |
 | EdgeTAM mask decoder | 视频分割 | 5.338 | **5.184** | +3% | 4.73 |
 | 3D-Speaker Res2NetV2 | 说话人识别 | 5.534 | **5.459** | +1% | 5.09 |
+| LivePortrait motion | 肖像动画 | 8.177 | **7.472** | +9% | — |
+| LivePortrait feature | 肖像动画 | 20.36 | **19.87** | +3% | — |
 | RAFT-stereo 256x640 | 立体深度 | 21.19 | **21.28** | ~0% | 20.9 |
 | EdgeTAM image encoder | 视频分割 | 23.88 | **23.73** | +1% | 22.35 |
 | RAFT-stereo 384x1280 | 立体深度 | 112.55 | **112.40** | ~0% | — |
 | IGEV++ (RTIGEV) | 立体深度 | 143.40 | **143.06** | ~0% | 139.80 |
+| LivePortrait spade | 肖像动画 | 233.3 | **232.5** | +0.3% | — |
 | mel_band_roformer | 音乐分离 | 426.3 | **425.6** | +0.2% | — |
 
 ### 跟踪、分割、关键点、QR码检测
@@ -188,6 +192,9 @@ YOLO26 nano 模型：**+22%** — 视觉模型中最高加速。完整 n/s/m/l/x
 | YOLO-World | 检测 | 9.71 | **9.25** | +5% | — |
 | Whisper-tiny enc | 语音识别 | 21.27 | **21.13** | +1% | — |
 | Whisper-tiny dec | 语音识别 | 4.05 | **3.93** | +3% | — |
+| Zipformer joiner | ASR | 0.664 | **0.344** | **+93%** | — |
+| Zipformer decoder | ASR | 0.437 | **0.243** | **+80%** | — |
+| Zipformer encoder | ASR | 3.602 | **3.018** | +19% | — |
 | SenseVoice 流式 | ASR（5种语言） | 13.11 | **12.37** | +6% | — |
 | SenseVoice 完整 | ASR（5种语言） | 55.33 | **54.69** | +1% | — |
 | MobileCLIP2-S0 | CLIP 图像 | 8.63 | **8.49** | +2% | — |
@@ -241,25 +248,34 @@ VLM 解码层加速 +32-45% — 与 LLM 模式一致。预估解码速度：Smol
 
 | 推理时间 | 示例 | 提升 |
 |:-:|:-:|:-:|
+| ~0.20 ms | LivePortrait stitching | **+57%** |
+| ~0.24 ms | Zipformer decoder | **+80%** |
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
+| ~0.34 ms | Zipformer joiner | **+93%** |
 | < 0.5 ms | OCR 分类器 | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~1.6 ms | SATRN decoder | **+37%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
+| ~3.0 ms | Zipformer encoder | +19% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~7.5 ms | LivePortrait motion | +9% |
 | ~10 ms | MixFormerV2 | +3% |
 | ~13 ms | DeepLabv3Plus | +4% |
+| ~20 ms | LivePortrait feature | +3% |
 | ~29 ms | OCR 检测器 | +1% |
 | ~107 ms | RMBG-1.4 | +1% |
 | ~143 ms | IGEV++ 立体深度 | ~0% |
+| ~233 ms | LivePortrait spade | +0.3% |
 | ~445 ms | CodeFormer | +0.1% |
 | ~498 ms | DeOldify artistic | +0.2% |
 
 这是因为 PCIe 往返延迟（约 0.3ms）在快速模型的总推理时间中占比更大。
 
-**已测试 100+ 模型**，涵盖 27 个类别：LLM、VLM、目标检测、姿态估计、实例/语义分割、分类、OCR、人脸识别/修复、超分辨率、零样本、CLIP、语音识别、TTS、深度估计、立体深度、视频分割、说话人识别、音频降噪、目标跟踪、关键点检测、QR码检测、背景去除、照片上色等。
+Zipformer joiner (+93%) 和 decoder (+80%) 是所有单次推理模型中**最高的加速记录**，超越了之前 +71%（OCR 分类器）的记录。这些超快的亚毫秒级 ASR 组件对 PCIe 延迟极其敏感。
+
+**已测试 110+ 模型**，涵盖 28 个类别：LLM、VLM、目标检测、姿态估计、实例/语义分割、分类、OCR、人脸识别/修复、超分辨率、零样本、CLIP、语音识别、TTS、深度估计、立体深度、视频分割、说话人识别、音频降噪、目标跟踪、关键点检测、QR码检测、背景去除、照片上色、肖像动画等。
 
 详情：[基准测试结果](docs/benchmark-results.md) | [PCIe 架构分析](docs/pcie-analysis.md)
 
