@@ -675,11 +675,14 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.7 ms | PPOCR_v5 rec (npu3) | **+18%** |
 | ~1.8 ms | YOLO26n-Det | **+21%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
+| ~1.8 ms | HY-MT1.5 LLM layer (HuanYuan) | +12% |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~2.6 ms | Insightface 1k3d68 (3D landmarks) | +15% |
+| ~2.4 ms | Qwen2.5-VL-3B LLM layer (Int4) | **+22%** |
 | ~2.7 ms | SmolVLM2-500M Post/FastVLM-1.5B LLM layer | +11-16% |
 | ~3.0 ms | Zipformer encoder/InternVL3-2B LLM layer | +5-19% |
+| ~3.1 ms | CAM++ speaker embedding | +17% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.2 ms | Qwen3-VL-2B LLM layer/InternVL3.5-2B LLM layer | +9% |
 | ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
@@ -700,6 +703,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7.0 ms | InternVL3-1B/InternVL2.5-1B LLM post | +6-8% |
+| ~7.3 ms | Qwen3-4B-2507-Int4 LLM layer | +5% |
 | ~7 ms | YOLOv5s/Insightface det | +5-7% |
 | ~7.5 ms | LivePortrait motion | +9% |
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
@@ -717,12 +721,15 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~11 ms | FG-CLIP text/SigLIP2 vision | +1-5% |
 | ~11.7 ms | YOLO26l-Det | +1% |
 | ~12.2 ms | YOLO26l-Pose | +6% |
+| ~12.4 ms | HY-MT1.5 LLM post | +4% |
 | ~12.4 ms | SenseVoice streaming | +6% |
 | ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
+| ~15.5 ms | Qwen2.5-VL-3B LLM post | +5% |
 | ~15.7 ms | Qwen3-VL-2B LLM post | +2% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~17 ms | Kokoro Part1 (TTS encoder) | +4% |
 | ~18 ms | PPOCR_v5 det (npu3) | +4% |
+| ~18.8 ms | Qwen3-4B-2507-Int4 LLM post | +2% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~22 ms | ESPCN x2 | +1% |
@@ -762,6 +769,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~426 ms | mel_band_roformer (music sep) | +0.2% |
 | ~445 ms | CodeFormer (face restoration) | +0.1% |
 | ~475 ms | Real-ESRGAN 256→1024 | +0.2% |
+| ~560 ms | Qwen2.5-VL-3B vision (392x392) | +0.2% |
 | ~581 ms | MiniCPM-V-4 SigLIP vision | +0.1% |
 | ~498 ms | DeOldify artistic | +0.2% |
 | ~597 ms | jina-clip-v2 image encoder | +0.2% |
@@ -773,7 +781,7 @@ For LLM inference, the effect is even more dramatic (+50-100%) because each toke
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**170+ models tested** across 35+ categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 10 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, MiniCPM-V-4). Portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, TTS (CosyVoice3, Kokoro, MeloTTS), and VAD provide additional data points.
+**180+ models tested** across 38+ categories confirm this pattern holds universally. For LLM, 11 configurations across 9 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 11 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, Qwen2.5-VL, MiniCPM-V-4). Translation LLM (HY-MT1.5, HuanYuan architecture), speaker embedding (CAM++), portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, TTS (CosyVoice3, Kokoro, MeloTTS), and VAD provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1658,6 +1666,101 @@ Both joiner and decoder are ultra-fast sub-millisecond models where PCIe round-t
 The encoder at 3ms shows +19% — still a strong benefit, consistent with other models in this latency range.
 
 For streaming ASR, the joiner and decoder are called once per frame (typically every 60ms), so the absolute time savings (~0.3ms + ~0.2ms per frame) are meaningful for low-latency applications.
+
+## Speaker Embedding — CAM++ (3D-Speaker)
+
+### Test Configuration
+
+- **Models**: [3D-Speaker-MT.Axera](https://huggingface.co/AXERA-TECH/3D-Speaker-MT.Axera) CAM++ speaker embedding (11M, for speaker identification/diarization)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations, 5 warmup
+- **Note**: Part of 3D-Speaker pipeline (VAD + CAM++ + SenseVoice)
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-------|------------------:|--------------------:|--------:|
+| CAM++ (campplus) | 3.634 | **3.107** | +17.0% |
+
+### Analysis
+
+CAM++ at 3.1ms shows +17% optimization benefit — consistent with models in the 3-4ms latency range. This is a speaker embedding model used for speaker diarization in meeting transcription. At 322 inferences/sec, it can process audio segments much faster than real-time. The existing 3D-Speaker ECAPA-TDNN (3.9ms, +3%) uses a different architecture; CAM++ is significantly more PCIe-latency-sensitive despite similar inference time.
+
+## Translation LLM — HY-MT1.5-1.8B (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [HY-MT1.5-1.8B_GPTQ_INT4](https://huggingface.co/AXERA-TECH/HY-MT1.5-1.8B_GPTQ_INT4) — Tencent HuanYuan MT 1.5 translation model, 32 layers + post (W4A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post), 3-5 warmup
+- **Note**: Supports 38 languages including zh/en/ja/ko/ru/fr/de/es. Context: 2K, prefill: 1K.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| LLM Layer (HuanYuan l0) | 2.045 | **1.826** | +12.0% |
+| LLM Post (CMM 269M) | 12.891 | **12.415** | +3.8% |
+
+### Estimated Decode Speed
+
+- Default: ~12.8 tok/s (32×2.045 + 12.891 ≈ 78.3 ms/tok)
+- Optimized: ~14.1 tok/s (32×1.826 + 12.415 ≈ 70.8 ms/tok)
+
+### Analysis
+
+HY-MT1.5-1.8B is a dedicated translation LLM with 32 HuanYuan layers at W4A16 quantization. At 14.1 tok/s optimized, it's surprisingly fast for a 1.8B model — faster than Qwen3-0.6B (10-12 tok/s) despite being 3x larger! The INT4 quantization and translation-optimized architecture (HuanYuan Dense) explains the efficiency. Layer speedup (+12%) is consistent with the 1.8ms inference time. This is the first non-Qwen/non-LLaMA LLM architecture benchmarked.
+
+## LLM — Qwen3-4B-Instruct-2507 GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [Qwen3-4B-Instruct-2507-GPTQ-Int4](https://huggingface.co/AXERA-TECH/3D-Speaker-Meeting-Summary) — Qwen3 4B Instruct (July 2025 version), 36 layers + post (W4A16), 8K context
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post), 3-5 warmup
+- **Note**: Part of 3D-Speaker-Meeting-Summary pipeline. CMM: 424M (post), p256 prefill.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| LLM Layer (Qwen3 l0) | 7.631 | **7.301** | +4.5% |
+| LLM Post (CMM 424M) | 19.270 | **18.836** | +2.3% |
+
+### Estimated Decode Speed
+
+- Default: ~3.4 tok/s (36×7.631 + 19.270 ≈ 294.0 ms/tok)
+- Optimized: ~3.55 tok/s (36×7.301 + 18.836 ≈ 281.7 ms/tok)
+
+### Analysis
+
+Qwen3-4B-2507 Int4 shows similar performance to the existing Qwen3-4B W8A16 (3.7 tok/s). The Int4 quantization doesn't provide a speed advantage because the 4B model is compute-bound at 7.3ms/layer — PCIe overhead is already minimal. The 8K context and p256 prefill configuration adds overhead compared to the p128 W8A16 version. Layer speedup (+4.5%) confirms that models at 7ms+ are firmly in compute-bound territory.
+
+## VLM — Qwen2.5-VL-3B-Instruct GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [Qwen2.5-VL-3B-Instruct-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Qwen2.5-VL-3B-Instruct-GPTQ-Int4) — Alibaba Qwen2.5 vision-language 3B, 36 layers + post + vision encoder (W4A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 10 iterations (post, vision), 3-5 warmup
+- **Note**: CMM: 340M (post), 807M (vision). Vision input: 392x392.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| Vision encoder (392x392) | 560.840 | **559.902** | +0.2% |
+| LLM Layer (Qwen2.5 l0) | 2.948 | **2.425** | +21.5% |
+| LLM Post (CMM 340M) | 16.147 | **15.452** | +4.5% |
+
+### Estimated Decode Speed
+
+- Default: ~8.2 tok/s (36×2.948 + 16.147 ≈ 122.3 ms/tok)
+- Optimized: ~9.7 tok/s (36×2.425 + 15.452 ≈ 102.8 ms/tok)
+
+### Analysis
+
+Qwen2.5-VL-3B is the first Qwen2.5-VL generation model benchmarked. The vision encoder at 560ms is the second heaviest measured (after MiniCPM-V-4 SigLIP at 581ms), using 807M CMM — fully compute-bound. Layer speedup (+21.5%) at 2.4ms is excellent, giving an estimated 9.7 tok/s — competitive with Qwen3-VL-2B (9.5 tok/s). The 36-layer Qwen2.5 architecture with Int4 quantization achieves good efficiency. This is the largest VLM (3B) that still delivers near-10 tok/s decode speed on the AX650N via PCIe.
 
 ## Methodology
 
