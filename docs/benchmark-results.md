@@ -670,6 +670,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.0 ms | InternVL2.5-1B LLM layer/SmolVLM2-500M LLM layer | **+25-62%** |
 | ~1.1 ms | VoxCPM feat_encoder MiniCPM layer | **+44%** |
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
+| ~1.2 ms | InternVL3.5-1B LLM layer (Int4) | **+26%** |
 | ~1.2 ms | FastVLM-0.5B LLM layer | **+32%** |
 | ~1.4 ms | ResNet18 | **+37%** |
 | ~1.4 ms | gtcrn (audio denoise) | +12% |
@@ -786,7 +787,7 @@ For LLM inference, the effect is even more dramatic (+50-100%) because each toke
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**185+ models tested** across 40+ categories confirm this pattern holds universally. For LLM, 11 configurations across 9 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 11 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, Qwen2.5-VL, MiniCPM-V-4). Translation LLM (HY-MT1.5, HuanYuan architecture), speaker embedding (CAM++), TTS (CosyVoice3, Kokoro, MeloTTS, VoxCPM), portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, and VAD provide additional data points.
+**190+ models tested** across 40+ categories confirm this pattern holds universally. For LLM, 11 configurations across 9 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 11 model families (SmolVLM2, FastVLM-0.5B/1.5B, SmolVLM, InternVL2.5, InternVL3, InternVL3.5, Janus-Pro, Qwen3-VL, Qwen2.5-VL, MiniCPM-V-4). Translation LLM (HY-MT1.5, HuanYuan architecture), speaker embedding (CAM++), TTS (CosyVoice3, Kokoro, MeloTTS, VoxCPM), portrait animation (LivePortrait), streaming ASR (Zipformer, FireRedASR), super-resolution, 3D detection, and VAD provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1766,6 +1767,40 @@ Qwen3-4B-2507 Int4 shows similar performance to the existing Qwen3-4B W8A16 (3.7
 ### Analysis
 
 Qwen2.5-VL-3B is the first Qwen2.5-VL generation model benchmarked. The vision encoder at 560ms is the second heaviest measured (after MiniCPM-V-4 SigLIP at 581ms), using 807M CMM — fully compute-bound. Layer speedup (+21.5%) at 2.4ms is excellent, giving an estimated 9.7 tok/s — competitive with Qwen3-VL-2B (9.5 tok/s). The 36-layer Qwen2.5 architecture with Int4 quantization achieves good efficiency. This is the largest VLM (3B) that still delivers near-10 tok/s decode speed on the AX650N via PCIe.
+
+## VLM — InternVL3.5-1B GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Models**: [InternVL3_5-1B_GPTQ_INT4](https://huggingface.co/AXERA-TECH/InternVL3_5-1B_GPTQ_INT4) — InternVL 3.5 1B, 28 Qwen3 layers + post (W4A16)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 100 iterations (layer), 20 iterations (post), 3-5 warmup
+- **Note**: Vision encoder not benchmarked (same InternViT as W8A16). Official native (W8A16): 21.60 tok/s.
+
+### With vs Without Optimization
+
+| Component | Default avg (ms) | Optimized avg (ms) | Speedup |
+|-----------|------------------:|--------------------:|--------:|
+| LLM Layer (Qwen3 l0) | 1.457 | **1.156** | +26.0% |
+| LLM Post (CMM 170M) | 8.334 | **8.002** | +4.1% |
+
+### Estimated Decode Speed
+
+- Default: ~20.4 tok/s (28×1.457 + 8.334 ≈ 49.1 ms/tok)
+- Optimized: ~24.8 tok/s (28×1.156 + 8.002 ≈ 40.4 ms/tok)
+- **Native (W8A16): 21.60 tok/s** — Int4 optimization **exceeds native W8A16 by 15%!**
+
+### W4A16 vs W8A16 Comparison (InternVL3.5-1B)
+
+| Metric | W8A16 | W4A16 (Int4) | Int4 advantage |
+|--------|------:|-------------:|---------------:|
+| Layer (optimized) | 1.526 ms | **1.156 ms** | -24% faster |
+| Post (optimized) | 8.134 ms | **8.002 ms** | -2% faster |
+| Estimated tok/s (opt) | ~20 | **~24.8** | +24% faster |
+
+### Analysis
+
+InternVL3.5-1B GPTQ-Int4 layers are **24% faster** than W8A16 at identical architecture — Int4 quantization reduces data transfer and computation per layer. At 1.16ms/layer, the optimization speedup (+26%) is consistent with the W8A16 variant (+25.5%). The estimated 24.8 tok/s **exceeds official native W8A16 speed** (21.6 tok/s) by 15%, demonstrating that Int4 quantization can compensate for PCIe overhead and even outperform the un-quantized native baseline.
 
 ## TTS — VoxCPM (Component Benchmarks)
 
