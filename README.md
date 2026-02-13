@@ -91,7 +91,11 @@ MiniCPM4-0.5B and SmolLM2-360M show the highest optimization gains at **+75-100%
 | YOLOv8s-Seg | 5.26 | **5.11** | +3% | 196 |
 | YOLOv5s | 6.92 | **6.59** | +5% | 152 |
 | YOLO26m | 9.47 | **9.04** | +5% | 111 |
+| YOLOv5s-Seg | 10.08 | **9.86** | +2% | 101 |
 | YOLOv8s-Pose | 11.81 | **11.26** | +5% | 89 |
+| YOLO11x | 25.86 | **25.19** | +3% | 40 |
+| YOLO11x-Pose | 25.65 | **25.55** | +0.4% | 39 |
+| YOLO11x-Seg | 35.51 | **35.15** | +1% | 28 |
 | Depth-Anything-V2-S | 34.00 | **33.44** | +2% | 30 |
 
 ### YOLO26 Pose Estimation & Segmentation (NPU 3-core, 640x640)
@@ -127,13 +131,16 @@ Key effect on vision: **2-22% faster + 2-3x more stable** latency (critical for 
 
 ### OCR — PPOCR_v5 (Text Detection + Recognition)
 
-| Model | Task | Default (ms) | Optimized (ms) | Speedup |
-|-------|------|----------:|------------:|--------:|
-| det_npu1 | Text Detection | 29.38 | **28.98** | +1% |
-| cls_npu1 | Text Direction | 0.759 | **0.445** | +71% |
-| rec_npu1 | Text Recognition | 3.958 | **3.681** | +8% |
+| Model | Task | Default (ms) | Optimized (ms) | Speedup | Native (ms) |
+|-------|------|----------:|------------:|--------:|------------:|
+| det_npu1 | Text Detection | 29.38 | **28.98** | +1% | — |
+| det_npu3 | Text Detection | 18.41 | **17.75** | +4% | 16.8 |
+| cls_npu1 | Text Direction | 0.759 | **0.445** | +71% | — |
+| cls_npu3 | Text Direction | 0.429 | **0.351** | +18% | 0.17 |
+| rec_npu1 | Text Recognition | 3.958 | **3.681** | +8% | — |
+| rec_npu3 | Text Recognition | 2.104 | **1.719** | +18% | 1.4 |
 
-Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-99% accuracy).
+npu3 variants use all 3 NPU cores (official config). Full OCR pipeline: **~1.5s** per image (16 text regions, Chinese + English, 81-99% accuracy).
 
 ### Scene Text Recognition — SATRN
 
@@ -272,21 +279,28 @@ The speedup correlates inversely with inference time — faster models benefit m
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | ~0.34 ms | Zipformer joiner | **+93%** |
+| ~0.35 ms | PPOCR_v5 cls (npu3) | **+18%** |
 | ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
-| < 0.5 ms | OCR classifier | **+71%** |
+| < 0.5 ms | OCR classifier (npu1) | **+71%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~1.0 ms | InternVL2.5-1B LLM layer | **+62%** |
 | ~1.6 ms | SATRN decoder | **+37%** |
+| ~1.7 ms | PPOCR_v5 rec (npu3) | **+18%** |
 | ~1.4 ms | ResNet18, gtcrn | **+12-37%** |
 | ~3.0 ms | Zipformer encoder | +19% |
 | ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
 | ~3.7 ms | Insightface w600k_r50 | +15% |
+| ~4.0 ms | YOLOv8s detection | +10% |
+| ~5.0 ms | YOLOv8s-Seg | +4% |
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.5 ms | LivePortrait motion | +9% |
-| ~10 ms | MixFormerV2 | +3% |
+| ~10 ms | MixFormerV2/YOLOv5s-Seg | +2-3% |
 | ~13 ms | DeepLabv3Plus | +4% |
+| ~18 ms | PPOCR_v5 det (npu3) | +4% |
 | ~20 ms | LivePortrait feature | +3% |
+| ~25 ms | YOLO11x/YOLO11x-Pose | +0.4-3% |
 | ~29 ms | OCR detector | +1% |
+| ~35 ms | YOLO11x-Seg | +1% |
 | ~92 ms | centerpoint/bevformer/MeloTTS | +0.5-0.7% |
 | ~107 ms | RMBG-1.4 | +1% |
 | ~143 ms | IGEV++ stereo depth | ~0% |
@@ -300,7 +314,7 @@ This is because PCIe round-trip latency (~0.3ms) is a larger fraction of total t
 
 Zipformer joiner at +93% is the highest speedup for single-inference models. VLM decoder layers consistently show +32-62%. InternVL2.5-1B optimized **matches official native speed** (32 tok/s).
 
-**120+ models tested** across 29 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, 3D object detection, and more.
+**130+ models tested** across 29 categories: LLM, VLM, vision detection, pose estimation, instance/semantic segmentation, classification, OCR, face recognition/restoration, super-resolution, zero-shot, CLIP, embedding, speech recognition, TTS, depth estimation, stereo depth, video segmentation, speaker ID, audio denoising, object tracking, keypoint detection, QR code detection, background removal, photo colorization, portrait animation, 3D object detection, and more.
 
 See [detailed benchmark results](docs/benchmark-results.md) and [PCIe architecture analysis](docs/pcie-analysis.md).
 

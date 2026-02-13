@@ -618,8 +618,9 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.27 ms | EdgeTAM prompt encoder | **+10%** |
 | ~0.3 ms | Insightface genderage | **+34%** |
 | ~0.34 ms | Zipformer joiner | **+93%** |
+| ~0.35 ms | PPOCR_v5 cls (npu3) | **+18%** |
 | ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
-| < 0.5 ms | OCR classifier (cls) | **+71%** |
+| < 0.5 ms | OCR classifier cls (npu1) | **+71%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
 | ~0.7 ms | MobileNetV2 | **+50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
@@ -630,18 +631,21 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.6 ms | SmolVLM-256M LLM post | **+33%** |
 | ~1.6 ms | SmolVLM2-256M LLM post | +21% |
 | ~1.6 ms | SATRN decoder | **+37%** |
+| ~1.7 ms | PPOCR_v5 rec (npu3) | **+18%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
 | ~3.0 ms | Zipformer encoder | +19% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.5 ms | ResNet50 | +8% |
-| ~3.6 ms | QR YOLO26n/YOLO11n | +12% |
+| ~3.6 ms | YOLO11s/QR YOLO26n/YOLO11n | +2-12% |
 | ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
+| ~4.0 ms | YOLOv8s detection | +10% |
 | ~4.6 ms | LibCLIP cnclip text | +10% |
-| ~5.0 ms | YOLO26s-Seg | +12% |
+| ~4.7 ms | YOLO11s-Seg | +2% |
+| ~5.0 ms | YOLO26s-Seg/YOLOv8s-Seg | +4-12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
@@ -652,22 +656,27 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~8.5 ms | MobileCLIP2-S0 image | +2% |
 | ~9 ms | RT-DETR/YOLO-World YOLO | +2-5% |
 | ~9.6 ms | YOLO26m-Pose | +7% |
+| ~10 ms | YOLOv5s-Seg | +2% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
 | ~10.4 ms | ESPCN x2 2K | +2% |
+| ~11.3 ms | YOLOv8s-Pose | +0.2% |
 | ~11 ms | FG-CLIP text/SigLIP2 vision | +1-5% |
 | ~12.2 ms | YOLO26l-Pose | +6% |
 | ~12.4 ms | SenseVoice streaming | +6% |
 | ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
+| ~18 ms | PPOCR_v5 det (npu3) | +4% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
 | ~22 ms | ESPCN x2 | +1% |
 | ~23 ms | Depth-Anything-3 small | +3% |
 | ~23 ms | SigLIP-so400m text | +3% |
 | ~24 ms | EdgeTAM image encoder | +1% |
+| ~25 ms | YOLO11x/YOLO11x-Pose | +0.4-3% |
 | ~26 ms | YOLO26x-Pose | +3% |
 | ~28 ms | SuperPoint | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
+| ~35 ms | YOLO11x-Seg/bge-small-en | +1-2% |
 | ~37 ms | YOLO26x-Seg | +2% |
 | ~43 ms | DEIMv2 DINOv3-S | +1% |
 | ~45 ms | FastVLM-0.5B vision encoder | +2% |
@@ -702,7 +711,7 @@ For LLM inference, the effect is even more dramatic (+50-100%) because each toke
 
 Zipformer joiner at **+93%** is the absolute record — beating OCR classifier (+71%) as the previous champion. The sub-0.5ms models consistently show the most dramatic speedups, confirming that PCIe round-trip latency is the dominant factor for ultra-fast inference.
 
-**120+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 4 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
+**130+ models tested** across 29 categories confirm this pattern holds universally. For LLM, 9 configurations across 7 model families from 0.36B to 7B were tested, all showing significant speedup (+19% to +100%). VLM component benchmarks add 4 model families (SmolVLM2, FastVLM, SmolVLM, InternVL2.5). Portrait animation (LivePortrait), streaming ASR (Zipformer), super-resolution, 3D detection, and TTS provide additional data points.
 
 ## Stereo Depth Estimation
 
@@ -1176,6 +1185,71 @@ Estimated decode speed (24 layers + post):
 ### Analysis
 
 InternVL2.5-1B is the first VLM where optimized performance **matches official native speed** (32 tok/s). The 1B Qwen2 LLM layers at 1.0ms are in the sweet spot where optimization (+62%) maximally reduces PCIe overhead. Vision encoder at 358ms is fully compute-bound. This demonstrates that for compute-heavy LLM layers (~1ms per layer), optimization can completely compensate for PCIe Gen2 x1 bandwidth limitation.
+
+## YOLO11 / YOLOv8 / YOLOv5-Seg — Detection, Pose, Segmentation
+
+### Test Configuration
+
+- **Models**: [YOLO11](https://huggingface.co/AXERA-TECH/YOLO11), [YOLO11-Pose](https://huggingface.co/AXERA-TECH/YOLO11-Pose), [YOLO11-Seg](https://huggingface.co/AXERA-TECH/YOLO11-Seg), [YOLOv8](https://huggingface.co/AXERA-TECH/YOLOv8), [YOLOv8-Pose](https://huggingface.co/AXERA-TECH/YOLOv8-Pose), [YOLOv8-Seg](https://huggingface.co/AXERA-TECH/YOLOv8-Seg), [YOLOv5-Seg](https://huggingface.co/AXERA-TECH/YOLOv5-Seg)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+- **Input**: 640x640
+
+### With vs Without Optimization
+
+| Model | Task | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------|------------------:|--------------------:|--------:|------------:|
+| YOLO11s | Detection | 3.663 | **3.601** | +1.7% | — |
+| YOLO11x | Detection | 25.857 | **25.191** | +2.6% | 25 |
+| YOLOv8s | Detection | 4.454 | **4.003** | +10.1% | 3.6 |
+| YOLO11x-Pose | Pose est | 25.652 | **25.548** | +0.4% | 25 |
+| YOLOv8s-Pose | Pose est | 11.299 | **11.276** | +0.2% | 10.97 |
+| YOLO11s-Seg | Segmentation | 4.760 | **4.676** | +1.8% | — |
+| YOLO11x-Seg | Segmentation | 35.507 | **35.148** | +1.0% | 34 |
+| YOLOv8s-Seg | Segmentation | 5.249 | **5.023** | +4.3% | 4.6 |
+| YOLOv5s-Seg | Segmentation | 10.081 | **9.861** | +2.2% | 9.55 |
+
+### Analysis
+
+Large models (YOLO11x at 25ms) reach **99% of native speed** — PCIe overhead is negligible for compute-heavy models. YOLOv8s detection shows +10% — at 4ms it benefits more from reduced PCIe latency. YOLO11x-Pose at +0.4% suggests its architecture is pure compute-bound at this inference time. YOLOv5s-Seg reaches 97% of native.
+
+## OCR — PPOCR_v5 (npu3 3-core)
+
+### Test Configuration
+
+- **Models**: [PPOCR_v5](https://huggingface.co/AXERA-TECH/PPOCR_v5) — det/cls/rec, npu3 variant (3 NPU cores)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Task | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------|------------------:|--------------------:|--------:|------------:|
+| det_npu3 | Text Detection | 18.411 | **17.752** | +3.6% | 16.8 |
+| cls_npu3 | Text Direction | 0.429 | **0.351** | +18.2% | 0.17 |
+| rec_npu3 | Text Recognition | 2.104 | **1.719** | +18.3% | 1.4 |
+
+### Analysis
+
+PPOCR_v5 npu3 variants are significantly faster than npu1 (det: 18ms vs 29ms, rec: 1.7ms vs 3.7ms). The cls classifier at 0.35ms shows +18% — consistent with sub-millisecond pattern. The rec recognizer at 1.7ms also shows +18% — very strong for a ~2ms model. Native cls at 0.17ms means PCIe overhead (0.18ms) actually equals the computation time — this is the theoretical minimum achievable through PCIe Gen2 x1.
+
+## Embedding — BGE-small-en-v1.5
+
+### Test Configuration
+
+- **Models**: [bge-small-en-v1.5](https://huggingface.co/AXERA-TECH/bge-small-en-v1.5) (69M, u16 npu3)
+- **Tool**: `axcl_run_model`
+- **Repeats**: 10 iterations, 3 warmup
+
+### With vs Without Optimization
+
+| Model | Default avg (ms) | Optimized avg (ms) | Speedup | Native (ms) |
+|-------|------------------:|--------------------:|--------:|------------:|
+| bge-small-en-v1.5 | 35.414 | **34.859** | +1.6% | 32.4 |
+
+### Analysis
+
+At 35ms, the model is compute-bound with minimal PCIe overhead benefit (+1.6%). Optimized reaches 93% of native speed.
 
 ## Portrait Animation — LivePortrait
 
