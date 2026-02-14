@@ -687,6 +687,8 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~2.0 ms | Gemma-3-1B LLM layer | **+23%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
+| ~2.5 ms | Qwen2.5-3B LLM layer (Int4) | +7% |
+| ~2.6 ms | Qwen3-1.7B LLM layer (Int4) | +11% |
 | ~2.6 ms | Qwen2.5-1.5B LLM layer (W8A16) | +15% |
 | ~2.6 ms | Insightface 1k3d68 (3D landmarks) | +15% |
 | ~2.4 ms | Qwen2.5-VL-3B LLM layer (Int4) | **+22%** |
@@ -698,6 +700,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~3.4 ms | Qwen3-VL-4B LLM layer (Int4) | +8% |
 | ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
 | ~3.5 ms | ResNet50 | +8% |
+| ~3.9 ms | Qwen2.5-3B LLM layer (W8A16) | +15% |
 | ~3.6 ms | YOLO11s/YOLO26s-Det/QR YOLO26n/YOLO11n | +2-12% |
 | ~3.7 ms | YOLO26s-Pose/Insightface w600k_r50 | +10-15% |
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
@@ -1873,6 +1876,79 @@ VoxCPM is a revelation for optimization impact on TTS. The stop_predictor at **+
 - **base_lm layer** (1.0ms): +57% — MiniCPM layers at 1ms are in the sweet spot
 
 The base_lm (24 MiniCPM layers) alone would decode at 36 tok/s optimized vs 24 tok/s default — a **50% speedup** for the main LLM backbone. VoxCPM's TTS quality depends heavily on iterative processing through multiple sub-networks, making PCIe optimization critical for end-to-end latency.
+
+## LLM — Qwen3-1.7B GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen3-1.7B-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Qwen3-1.7B-GPTQ-Int4)
+- **Architecture**: Qwen3 1.7B, W4A16 GPTQ quantization, context 256 prefill 3584
+- **Components**: 28 decoder layers (layer0 43MB), post (325MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×28) | 2.557 | 2.835 | **+10.9%** |
+| LLM Post | 15.688 | 16.179 | **+3.1%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 28 × 2.557 + 15.688 = 87.3ms → **11.5 tok/s**
+- **Default**: 28 × 2.835 + 16.179 = 95.6ms → **10.5 tok/s**
+- **Optimization gain**: +9.5%
+
+### W4A16 vs W8A16 Comparison (Qwen3-1.7B)
+
+| Metric | W4A16 (Int4) | W8A16 (measured) |
+|--------|:-:|:-:|
+| Layer time (opt) | 2.557ms | ~3.5ms (estimated from MEMORY) |
+| Decode speed (opt) | 11.5 tok/s | 7.8-8.0 tok/s |
+| Improvement | **+44% vs W8A16** | — |
+
+### Analysis
+
+Qwen3-1.7B Int4 at 11.5 tok/s is a significant upgrade over W8A16 (7.8-8.0 tok/s from previous benchmarks), delivering a 44% speed increase through quantization alone. The +10.9% layer optimization is moderate for a 2.5ms model, and the c256 prefix context (vs c128 for most others) doesn't noticeably impact single-token decode speed.
+
+## LLM — Qwen2.5-3B-Instruct (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen2.5-3B-Instruct](https://huggingface.co/AXERA-TECH/Qwen2.5-3B-Instruct)
+- **Architecture**: Qwen2.5 3B, both W8A16 and W4A16 (GPTQ-Int4) variants
+- **Components**: 36 decoder layers + post (324MB shared)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Variant | Component | Optimized (ms) | Default (ms) | Improvement |
+|---------|-----------|:-:|:-:|:-:|
+| W8A16 | LLM Layer (×36) | 3.861 | 4.436 | **+14.9%** |
+| W8A16 | LLM Post | 15.803 | 16.116 | **+2.0%** |
+| W4A16 | LLM Layer (×36) | 2.506 | 2.678 | **+6.9%** |
+| W4A16 | LLM Post | 15.796 | 16.383 | **+3.7%** |
+
+### Estimated Decode Speed
+
+| Variant | Optimized | Default | Gain |
+|---------|:-:|:-:|:-:|
+| W8A16 | 36×3.861 + 15.803 = 154.8ms → **6.5 tok/s** | 175.8ms → **5.7 tok/s** | +13.6% |
+| W4A16 | 36×2.506 + 15.796 = 106.0ms → **9.4 tok/s** | 112.8ms → **8.9 tok/s** | +6.4% |
+
+### W4A16 vs W8A16 Comparison
+
+| Metric | W4A16 (Int4) | W8A16 | Int4 advantage |
+|--------|:-:|:-:|:-:|
+| Layer time (opt) | 2.506ms | 3.861ms | 35% faster |
+| Decode speed (opt) | 9.4 tok/s | 6.5 tok/s | +45% |
+| Decode speed (default) | 8.9 tok/s | 5.7 tok/s | +56% |
+
+### Analysis
+
+Qwen2.5-3B at 9.4 tok/s (Int4, optimized) is faster than Qwen3-4B W8A16 (3.7 tok/s) despite being a similarly-sized model, showing the massive impact of Int4 quantization. The W8A16 variant shows a consistent +14.9% layer speedup, while Int4 layers show only +6.9% — the smaller Int4 layers (2.5ms) are already quite fast, and the PCIe overhead is less dominant at this layer size. Post model timings are identical between variants, confirming they share the same embedding layer.
 
 ## LLM — Qwen2.5-1.5B-Instruct (Component Benchmarks)
 

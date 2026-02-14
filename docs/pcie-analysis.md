@@ -8,9 +8,11 @@ The Rockchip RK3588 SoC has 5 PCIe controllers:
 |-----------|---------|------|-----------|-----------|
 | pcie3x4 | 0xfe150000 | Synopsys DWC | 4 | Gen3 (8 GT/s) |
 | pcie3x2 | 0xfe160000 | Synopsys DWC | 2 | Gen3 (8 GT/s) |
-| pcie2x1l0 | 0xfe170000 | Synopsys DWC | 1 | Gen2 (5 GT/s) |
-| pcie2x1l1 | 0xfe180000 | Synopsys DWC | 1 | Gen2 (5 GT/s) |
+| pcie2x1l0 | 0xfe170000 | Synopsys DWC | 1 | Gen3 (8 GT/s)* |
+| pcie2x1l1 | 0xfe180000 | Synopsys DWC | 1 | Gen3 (8 GT/s)* |
 | pcie2x1l2 | 0xfe190000 | Synopsys DWC | 1 | Gen2 (5 GT/s) |
+
+\* Despite the name `pcie2x1l*`, the CM3588 device tree sets `max-link-speed = <3>` (Gen3) for l0 and l1. Only l2 is Gen2.
 
 ## CM3588 NAS Board Layout
 
@@ -20,7 +22,7 @@ The FriendlyElec CM3588 NAS board splits **all** PCIe controllers into single x1
 pcie@fe150000 (pcie3x4, 1 lane) → M.2 NVMe Slot 1 (Gen3 x1)
 pcie@fe160000 (pcie3x2, 1 lane) → M.2 NVMe Slot 2 (Gen3 x1)
 pcie@fe170000 (pcie2x1l0)       → M.2 NVMe Slot 3 (Gen3 x1)
-pcie@fe180000 (pcie2x1l1)       → M.2 Slot 4 / AX650N (Gen2 x1) ← HERE
+pcie@fe180000 (pcie2x1l1)       → M.2 Slot 4 / AX650N (Gen3 x1, negotiated Gen2) ← HERE
 pcie@fe190000 (pcie2x1l2)       → RTL8125 Ethernet (Gen2 x1)
 ```
 
@@ -44,20 +46,24 @@ MSI: Enabled, Count=1/4
 
 ## Root Cause: x2 → x1 Downgrade
 
-**Hardware limitation.** The root port at `pcie@fe180000` only provides 1 physical lane:
+**Two hardware limitations:**
+
+1. **Width**: Root port only provides 1 physical lane (x1), but AX650N wants 2 (x2)
+2. **Speed**: Root port supports Gen3 (8GT/s), but AX650N only supports Gen2 (5GT/s)
 
 ```
-Root Port LnkCap: Speed 8GT/s, Width x1  ← only 1 lane available
-AX650N   LnkCap: Speed 5GT/s, Width x2  ← device wants 2 lanes
+Root Port LnkCap: Speed 8GT/s (Gen3), Width x1  ← only 1 lane available
+AX650N   LnkCap: Speed 5GT/s (Gen2), Width x2  ← device wants 2 lanes, only Gen2
 
-Negotiated: Speed 5GT/s (limited by device), Width x1 (limited by root port)
+Negotiated: Speed 5GT/s (limited by AX650N), Width x1 (limited by root port)
 ```
 
-This cannot be fixed in software. The board physically routes only 1 PCIe lane to the M.2 slot.
+Neither limitation can be fixed in software. The link runs at the lowest common denominator.
 
 Effective bandwidth:
 - **Current**: PCIe Gen2 x1 = ~500 MB/s
-- **With x2**: PCIe Gen2 x2 = ~1000 MB/s (requires different board)
+- **Theoretical max**: PCIe Gen2 x2 = ~1000 MB/s (requires x2 root port)
+- **If AX650N supported Gen3**: PCIe Gen3 x1 = ~985 MB/s (root port already capable)
 
 ## MaxPayload Impact
 

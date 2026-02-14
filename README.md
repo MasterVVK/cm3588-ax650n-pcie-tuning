@@ -8,7 +8,7 @@
 
 The AX650N NPU (24 TOPS INT8) connected via M.2 on CM3588 NAS delivers only **7-7.5 tok/s** for LLM inference (Qwen3-0.6B) instead of the expected 12-13 tok/s. The root causes:
 
-1. **PCIe Gen2 x1 hardware limitation** — CM3588 routes only 1 lane to the M.2 slot (device supports x2)
+1. **PCIe Gen2 x1 hardware limitation** — CM3588 routes only 1 lane to the M.2 slot (Gen3 x1 controller, but AX650N only supports Gen2)
 2. **IRQ on little core** — all interrupts handled by slow Cortex-A55 @ 1.8 GHz
 3. **Dynamic frequency scaling** — CPU frequency drops between inference calls
 
@@ -341,7 +341,7 @@ sudo ./uninstall.sh
 
 ## How It Works
 
-The CM3588 NAS uses RK3588's PCIe 2.0 x1 controller (`pcie2x1l1` at `0xfe180000`) for the M.2 slot where AX650N is installed. This limits bandwidth to ~500 MB/s (device supports 1000 MB/s with x2).
+The CM3588 NAS uses RK3588's PCIe 3.0 x1 controller (`pcie2x1l1` at `0xfe180000`, max-link-speed=3) for the M.2 slot where AX650N is installed. However, the AX650N only supports PCIe 2.0 (LnkCap 5GT/s), so the link negotiates down to **PCIe 2.0 x1** (~500 MB/s). The device supports x2 width but the controller is x1-only.
 
 While the PCIe width cannot be changed (hardware limitation), the software-side bottlenecks are significant:
 
