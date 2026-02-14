@@ -682,9 +682,12 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~1.7 ms | PPOCR_v5 rec (npu3) | **+18%** |
 | ~1.8 ms | YOLO26n-Det | **+21%** |
 | ~1.7 ms | YOLO26n-Pose | **+22%** |
+| ~1.7 ms | Qwen2.5-1.5B LLM layer (Int4) | **+28%** |
 | ~1.8 ms | HY-MT1.5 LLM layer (HuanYuan) | +12% |
+| ~2.0 ms | Gemma-3-1B LLM layer | **+23%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
+| ~2.6 ms | Qwen2.5-1.5B LLM layer (W8A16) | +15% |
 | ~2.6 ms | Insightface 1k3d68 (3D landmarks) | +15% |
 | ~2.4 ms | Qwen2.5-VL-3B LLM layer (Int4) | **+22%** |
 | ~2.7 ms | SmolVLM2-500M Post/FastVLM-1.5B LLM layer | +11-16% |
@@ -692,6 +695,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~3.1 ms | CAM++ speaker embedding | +17% |
 | ~3.0 ms | YOLO-World CLIP | +9% |
 | ~3.2 ms | Qwen3-VL-2B LLM layer/InternVL3.5-2B LLM layer | +9% |
+| ~3.4 ms | Qwen3-VL-4B LLM layer (Int4) | +8% |
 | ~3.4 ms | Janus-Pro-1B LLM layer | +15% |
 | ~3.5 ms | ResNet50 | +8% |
 | ~3.6 ms | YOLO11s/YOLO26s-Det/QR YOLO26n/YOLO11n | +2-12% |
@@ -707,6 +711,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
 | ~5.8 ms | SileroVAD | +9% |
+| ~6.3 ms | DeepSeek-R1-7B LLM layer (Int4) | +10% |
 | ~5.8 ms | CLIP ViT-L/14 text | +10% |
 | ~7.0 ms | FastVLM-0.5B LLM post | +7% |
 | ~7.0 ms | InternVL3-1B/InternVL2.5-1B LLM post | +6-8% |
@@ -722,6 +727,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~10 ms | YOLOv5s-Seg | +2% |
 | ~10.4 ms | Janus-Pro-1B LLM post | +7% |
 | ~10.4 ms | MixFormerV2 (tracking) | +3% |
+| ~11.7 ms | Qwen2.5-1.5B LLM post (W8A16/Int4) | +2-4% |
 | ~11.5 ms | FastVLM-1.5B LLM post | +7% |
 | ~10.4 ms | ESPCN x2 2K | +2% |
 | ~11.3 ms | YOLOv8s-Pose | +0.2% |
@@ -731,11 +737,13 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~12.4 ms | HY-MT1.5 LLM post | +4% |
 | ~12.4 ms | SenseVoice streaming | +6% |
 | ~13 ms | YOLOv7-Face/DeepLabv3Plus/jina-clip text | +1-4% |
+| ~15.5 ms | Gemma-3-1B LLM post | +5% |
 | ~15.5 ms | Qwen2.5-VL-3B LLM post | +5% |
 | ~15.7 ms | Qwen3-VL-2B LLM post | +2% |
 | ~16 ms | RealESRGAN-x2 (CodeFormer) | +2% |
 | ~17 ms | Kokoro Part1 (TTS encoder) | +4% |
 | ~18 ms | PPOCR_v5 det (npu3) | +4% |
+| ~18.8 ms | Qwen3-VL-4B-Int4 LLM post | +2% |
 | ~18.8 ms | Qwen3-4B-2507-Int4 LLM post | +2% |
 | ~20 ms | LivePortrait feature | +3% |
 | ~21 ms | Whisper encoder/RAFT-stereo | ~0-1% |
@@ -743,6 +751,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~23 ms | Depth-Anything-3 small | +3% |
 | ~23 ms | SigLIP-so400m text | +3% |
 | ~24 ms | FireRedASR decoder/EdgeTAM image encoder | +1-3% |
+| ~26 ms | DeepSeek-R1-7B LLM post (Int4) | +3% |
 | ~25 ms | YOLO11x/YOLO11x-Pose | +0.4-3% |
 | ~25 ms | YOLO26x-Det/YOLO26x-Pose | +2-3% |
 | ~28 ms | SuperPoint | +1% |
@@ -756,6 +765,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~65 ms | MobileCLIP2-S4 image | +1% |
 | ~68 ms | Depth-Anything-3 base | +1% |
 | ~70 ms | CLIP ViT-L/14 image | +1% |
+| ~86 ms | Qwen3-VL-4B vision (u8) | +0.4% |
 | ~89 ms | LibCLIP cnclip vision | +0.8% |
 | ~92 ms | centerpoint/bevformer/MeloTTS | +0.5-0.7% |
 | ~99 ms | SmolVLM2/SmolVLM-256M vision | +0.7-1% |
@@ -1863,6 +1873,126 @@ VoxCPM is a revelation for optimization impact on TTS. The stop_predictor at **+
 - **base_lm layer** (1.0ms): +57% — MiniCPM layers at 1ms are in the sweet spot
 
 The base_lm (24 MiniCPM layers) alone would decode at 36 tok/s optimized vs 24 tok/s default — a **50% speedup** for the main LLM backbone. VoxCPM's TTS quality depends heavily on iterative processing through multiple sub-networks, making PCIe optimization critical for end-to-end latency.
+
+## LLM — Qwen2.5-1.5B-Instruct (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen2.5-1.5B-Instruct](https://huggingface.co/AXERA-TECH/Qwen2.5-1.5B-Instruct)
+- **Architecture**: Qwen2.5 1.5B, both W8A16 and W4A16 (GPTQ-Int4) variants
+- **Components**: 28 decoder layers + post (243MB shared)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Variant | Component | Optimized (ms) | Default (ms) | Improvement |
+|---------|-----------|:-:|:-:|:-:|
+| W8A16 | LLM Layer (×28) | 2.553 | 2.933 | **+14.9%** |
+| W8A16 | LLM Post | 11.704 | 12.222 | **+4.4%** |
+| W4A16 | LLM Layer (×28) | 1.722 | 2.209 | **+28.3%** |
+| W4A16 | LLM Post | 11.733 | 11.899 | **+1.4%** |
+
+### Estimated Decode Speed
+
+| Variant | Optimized | Default | Gain |
+|---------|:-:|:-:|:-:|
+| W8A16 | 28×2.553 + 11.704 = 83.2ms → **12.0 tok/s** | 94.3ms → **10.6 tok/s** | +13.4% |
+| W4A16 | 28×1.722 + 11.733 = 59.9ms → **16.7 tok/s** | 73.8ms → **13.6 tok/s** | +23.0% |
+
+### W4A16 vs W8A16 Comparison
+
+| Metric | W4A16 (Int4) | W8A16 | Int4 advantage |
+|--------|:-:|:-:|:-:|
+| Layer time (opt) | 1.722ms | 2.553ms | 33% faster |
+| Decode speed (opt) | 16.7 tok/s | 12.0 tok/s | +39% |
+| Decode speed (default) | 13.6 tok/s | 10.6 tok/s | +28% |
+
+### Analysis
+
+Qwen2.5-1.5B provides a clean W4A16 vs W8A16 comparison at the 1.5B scale. Int4 quantization delivers a massive 39% speed advantage (16.7 vs 12.0 tok/s) with optimization, and 28% without. The Int4 layer at 1.722ms shows a huge +28.3% optimization gain — among the highest for LLM layers, confirming that smaller/faster layers benefit more from PCIe optimization. Post model is identical between variants (same 243MB, same timing), as expected since it only contains the embedding layer.
+
+## LLM — Gemma-3-1B-it (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Gemma-3-1B-it](https://huggingface.co/AXERA-TECH/Gemma-3-1B-it)
+- **Architecture**: Gemma 3 1B (Google), W8A16 quantization
+- **Components**: 26 decoder layers (layer0 47MB), post (321MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×26) | 1.970 | 2.419 | **+22.8%** |
+| LLM Post | 15.458 | 16.227 | **+4.7%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 26 × 1.970 + 15.458 = 66.7ms → **15.0 tok/s**
+- **Default**: 26 × 2.419 + 16.227 = 79.1ms → **12.6 tok/s**
+- **Optimization gain**: +18.6%
+
+### Analysis
+
+Gemma-3-1B is the first Google architecture tested on AX650N. At 15.0 tok/s optimized, it's competitive with InternVL3.5-1B Int4 (24.8 tok/s) when accounting for the difference in quantization: Gemma-3 is W8A16 while InternVL3.5-1B Int4 is W4A16 (half the data per layer). The +22.8% layer speedup is high for a ~2ms model, consistent with the optimization pattern. Initial 10-repeat benchmarks showed misleading results due to CPU cache warmth from the previous run — 30 repeats gave reliable data.
+
+## LLM — DeepSeek-R1-Distill-Qwen-7B GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4](https://huggingface.co/AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4)
+- **Architecture**: Qwen2 7B (DeepSeek-R1 distilled), W4A16 GPTQ quantization
+- **Components**: 28 decoder layers (layer0 130MB), post (567MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 3, repeat 10
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×28) | 6.319 | 6.945 | **+9.9%** |
+| LLM Post | 26.251 | 26.903 | **+2.5%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 28 × 6.319 + 26.251 = 203.2ms → **4.9 tok/s**
+- **Default**: 28 × 6.945 + 26.903 = 221.4ms → **4.5 tok/s**
+- **Optimization gain**: +8.9%
+
+### Analysis
+
+DeepSeek-R1-7B Int4 at 4.9 tok/s outperforms Qwen2.5-7B W4A16 (4.4 tok/s) by 11%, likely due to the newer GPTQ-Int4 quantization format vs the older W4A16. Both are 7B Qwen2-based models, so the architecture is identical — the difference is purely quantization efficiency. For a reasoning model, 4.9 tok/s is usable, though the long `<think>` blocks typical of R1 will add latency.
+
+## VLM — Qwen3-VL-4B-Instruct GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen3-VL-4B-Instruct-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Qwen3-VL-4B-Instruct-GPTQ-Int4)
+- **Architecture**: Qwen3 VL 4B, W4A16 GPTQ quantization
+- **Components**: 36 decoder layers (layer0 79MB), post (405MB), vision_u8 (422MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 3, repeat 10
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| Vision (u8) | 85.687 | 86.046 | **+0.4%** |
+| LLM Layer (×36) | 3.431 | 3.688 | **+7.5%** |
+| LLM Post | 18.842 | 19.181 | **+1.8%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 36 × 3.431 + 18.842 = 142.4ms → **7.0 tok/s**
+- **Default**: 36 × 3.688 + 19.181 = 151.9ms → **6.6 tok/s**
+- **Optimization gain**: +6.7%
+
+### Analysis
+
+Qwen3-VL-4B Int4 is the largest VLM tested with Int4 quantization. The 7.0 tok/s decode speed is reasonable for a 4B model — close to Qwen3-4B W8A16 native (7.42 tok/s). Vision encoder at 85.7ms is very fast for 4B VL, essentially no optimization effect (NPU-bound at this size). The 36 decoder layers at 3.4ms each show moderate +7.5% speedup — consistent with mid-size models in the pattern table.
 
 ## Methodology
 
