@@ -663,12 +663,15 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~0.45 ms | VoxCPM LocDiT part1 | **+53%** |
 | ~0.45 ms | SmolVLM-256M LLM layer | **+56%** |
 | < 0.5 ms | OCR classifier cls (npu1) | **+71%** |
+| ~0.55 ms | SmolVLM2-256M LLM layer (C128-P768) | **+64%** |
 | ~0.57 ms | SmolVLM2-256M LLM layer | **+45%** |
+| ~0.65 ms | Qwen2.5-Omni Talker post | **+67%** |
 | ~0.7 ms | MobileNetV2/Insightface 2d106det | **+20-50%** |
 | ~0.7 ms | EdgeTAM prompt mask | +4% |
 | ~0.9 ms | Qwen2.5-0.5B LLM layer (Int4) | **+33%** |
 | ~1.0 ms | VoxCPM base_lm MiniCPM layer | **+57%** |
 | ~1.0 ms | InternVL2.5-1B LLM layer/SmolVLM2-500M LLM layer | **+25-62%** |
+| ~1.1 ms | Qwen2.5-Omni Talker layer | **+43%** |
 | ~1.1 ms | VoxCPM feat_encoder MiniCPM layer | **+44%** |
 | ~1.1 ms | InternVL3-1B LLM layer | **+54%** |
 | ~1.2 ms | InternVL3.5-1B LLM layer (Int4) | **+26%** |
@@ -711,6 +714,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~3.9 ms | 3D-Speaker ECAPA-TDNN | +3% |
 | ~4.0 ms | QR DEIMv2-femto | +9% |
 | ~4.0 ms | YOLOv8s detection | +10% |
+| ~4.3 ms | Qwen2.5-Omni Thinker layer | +11% |
 | ~4.4 ms | cnclip ViT-L/14 text | +14% |
 | ~4.6 ms | LibCLIP cnclip text | +10% |
 | ~4.7 ms | YOLO11s-Seg | +2% |
@@ -1883,6 +1887,64 @@ VoxCPM is a revelation for optimization impact on TTS. The stop_predictor at **+
 - **base_lm layer** (1.0ms): +57% — MiniCPM layers at 1ms are in the sweet spot
 
 The base_lm (24 MiniCPM layers) alone would decode at 36 tok/s optimized vs 24 tok/s default — a **50% speedup** for the main LLM backbone. VoxCPM's TTS quality depends heavily on iterative processing through multiple sub-networks, making PCIe optimization critical for end-to-end latency.
+
+## VLM — SmolVLM2-256M-Video (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/SmolVLM2-256M-Video-Instruct_Ax650](https://huggingface.co/AXERA-TECH/SmolVLM2-256M-Video-Instruct_Ax650)
+- **Architecture**: SmolVLM2 256M (LLaMA backbone), W8A16
+- **Components**: 30 decoder layers (layer0 4.4MB), post (28MB), context 128, prefill 768
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×30) | 0.551 | 0.906 | **+64.4%** |
+| LLM Post | 1.633 | 1.833 | **+12.2%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 30 × 0.551 + 1.633 = 18.2ms → **55.0 tok/s**
+- **Default**: 30 × 0.906 + 1.833 = 29.0ms → **34.5 tok/s**
+- **Optimization gain**: +59.4%
+
+### Analysis
+
+SmolVLM2-256M at **55.0 tok/s** sets a new record for fastest LLM/VLM decode speed measured via PCIe on AX650N, beating Qwen2.5-0.5B Int4 (35.3 tok/s). The layer at 0.551ms shows a massive **+64.4% optimization** — consistent with sub-millisecond models where PCIe round-trip latency dominates. This is the smallest VLM tested (256M params) and demonstrates that tiny models can achieve real-time conversational speeds even over a PCIe Gen2 x1 bottleneck.
+
+## Multimodal — Qwen2.5-Omni-3B (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen2.5-Omni-3B](https://huggingface.co/AXERA-TECH/Qwen2.5-Omni-3B)
+- **Architecture**: Qwen2.5-Omni 3B — dual model: Thinker (text) + Talker (audio generation)
+- **Thinker**: 36 decoder layers (layer0 87MB), post (324MB)
+- **Talker**: 24 decoder layers (layer0 17MB), post (8MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| Thinker Layer (×36) | 4.269 | 4.754 | **+11.4%** |
+| Thinker Post | 15.538 | 15.905 | **+2.4%** |
+| Talker Layer (×24) | 1.128 | 1.609 | **+42.6%** |
+| Talker Post | 0.649 | 1.083 | **+66.9%** |
+
+### Estimated Decode Speed
+
+| Component | Optimized | Default | Gain |
+|-----------|:-:|:-:|:-:|
+| Thinker | 36×4.269 + 15.538 = 169.2ms → **5.9 tok/s** | 187.0ms → **5.3 tok/s** | +10.5% |
+| Talker | 24×1.128 + 0.649 = 27.7ms → **36.1 tok/s** | 39.7ms → **25.2 tok/s** | +43.3% |
+
+### Analysis
+
+Qwen2.5-Omni-3B is the first multimodal model with both text and audio generation. The Talker component is remarkably small (8MB post!) and fast, with the post at 0.649ms showing a **+66.9% optimization** — ranking among the top-3 highest speedups ever measured (alongside Zipformer joiner +93% and decoder +80%). The Talker's 36.1 tok/s means audio token generation is much faster than Thinker's text reasoning (5.9 tok/s), which makes sense architecturally — the Talker generates audio codes in response to Thinker's text output. Combined pipeline latency depends on sequential Thinker → Talker processing.
 
 ## VLM — Xiaomi-MiMo-VL-Miloco-7B GPTQ-Int4 (Component Benchmarks)
 
