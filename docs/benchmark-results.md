@@ -691,6 +691,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~2.0 ms | Gemma-3-1B LLM layer | **+23%** |
 | ~1.8 ms | Qwen3-Embedding layer | +12.5% |
 | ~2.3 ms | YOLO26n-Seg | **+22%** |
+| ~2.1 ms | Qwen3-VL-2B LLM layer (Int4) | **+19%** |
 | ~2.5 ms | Qwen2.5-3B LLM layer (Int4) | +7% |
 | ~2.6 ms | Qwen3-1.7B LLM layer (Int4) | +11% |
 | ~2.6 ms | Qwen2.5-1.5B LLM layer (W8A16) | +15% |
@@ -714,6 +715,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~4.6 ms | LibCLIP cnclip text | +10% |
 | ~4.7 ms | YOLO11s-Seg | +2% |
 | ~5.0 ms | YOLO26s-Seg/YOLOv8s-Seg | +4-12% |
+| ~5.0 ms | MiMo-VL-7B LLM layer (Int4) | +14% |
 | ~5.3 ms | MiniCPM-V-4 LLM layer (LLaMA) | +12% |
 | ~5.2 ms | EdgeTAM mask decoder | +3% |
 | ~5.5 ms | 3D-Speaker Res2NetV2 | +1% |
@@ -762,6 +764,7 @@ The speedup from PCIe optimization correlates inversely with inference time:
 | ~25 ms | YOLO11x/YOLO11x-Pose | +0.4-3% |
 | ~25 ms | YOLO26x-Det/YOLO26x-Pose | +2-3% |
 | ~28 ms | SuperPoint | +1% |
+| ~30 ms | MiMo-VL-7B LLM post (Int4) | +1% |
 | ~29 ms | OCR detector (det)/YOLOv5l-Face | +1-2% |
 | ~35 ms | YOLO11x-Seg/bge-small-en | +1-2% |
 | ~37 ms | YOLO26x-Seg | +2% |
@@ -1880,6 +1883,68 @@ VoxCPM is a revelation for optimization impact on TTS. The stop_predictor at **+
 - **base_lm layer** (1.0ms): +57% — MiniCPM layers at 1ms are in the sweet spot
 
 The base_lm (24 MiniCPM layers) alone would decode at 36 tok/s optimized vs 24 tok/s default — a **50% speedup** for the main LLM backbone. VoxCPM's TTS quality depends heavily on iterative processing through multiple sub-networks, making PCIe optimization critical for end-to-end latency.
+
+## VLM — Xiaomi-MiMo-VL-Miloco-7B GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Xiaomi-MiMo-VL-Miloco-7B-AX650-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Xiaomi-MiMo-VL-Miloco-7B-AX650-GPTQ-Int4)
+- **Architecture**: Xiaomi MiMo-VL 7B (Qwen2.5-VL backbone), W4A16 GPTQ quantization
+- **Components**: 36 decoder layers (layer0 113MB), post (648MB), vision encoder
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×36) | 5.020 | 5.715 | **+13.8%** |
+| LLM Post | 30.064 | 30.487 | **+1.4%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 36 × 5.020 + 30.064 = 210.8ms → **4.7 tok/s**
+- **Default**: 36 × 5.715 + 30.487 = 236.2ms → **4.2 tok/s**
+- **Optimization gain**: +12.1%
+
+### Analysis
+
+Xiaomi-MiMo-VL-7B is the first non-Qwen/non-InternVL vision-language model tested, and the largest VLM benchmarked. At 4.7 tok/s, it's usable for visual question answering. The 7B model with 36 layers uses Qwen2.5-VL architecture under the hood. Layer optimization at +13.8% is moderate for a 5ms model, and the massive 648MB post (30ms) shows minimal optimization effect as expected for large compute-bound operations.
+
+## VLM — Qwen3-VL-2B-Instruct GPTQ-Int4 (Component Benchmarks)
+
+### Test Configuration
+
+- **Model**: [AXERA-TECH/Qwen3-VL-2B-Instruct-GPTQ-Int4](https://huggingface.co/AXERA-TECH/Qwen3-VL-2B-Instruct-GPTQ-Int4)
+- **Architecture**: Qwen3 VL 2B, W4A16 GPTQ quantization
+- **Components**: 28 decoder layers (layer0 38MB), post (324MB)
+- **NPU**: 3-core mode
+- **Benchmark**: axcl_run_model, warmup 5, repeat 30
+
+### With vs Without Optimization
+
+| Component | Optimized (ms) | Default (ms) | Improvement |
+|-----------|:-:|:-:|:-:|
+| LLM Layer (×28) | 2.115 | 2.521 | **+19.2%** |
+| LLM Post | 15.646 | 15.937 | **+1.9%** |
+
+### Estimated Decode Speed
+
+- **Optimized**: 28 × 2.115 + 15.646 = 74.9ms → **13.4 tok/s**
+- **Default**: 28 × 2.521 + 15.937 = 86.5ms → **11.6 tok/s**
+- **Optimization gain**: +15.5%
+
+### W4A16 vs W8A16 Comparison (Qwen3-VL-2B)
+
+| Metric | W4A16 (Int4) | W8A16 |
+|--------|:-:|:-:|
+| Layer time (opt) | 2.115ms | ~3.2ms |
+| Decode speed (opt) | 13.4 tok/s | ~9.5 tok/s |
+| Int4 advantage | **+41%** | — |
+
+### Analysis
+
+Qwen3-VL-2B Int4 delivers 13.4 tok/s — 41% faster than W8A16 (~9.5 tok/s estimated). The +19.2% layer speedup is consistent with the ~2ms optimization pattern. Multiple context/prefill variants exist on HuggingFace (C256/C512/P1536/P3584), but all share the same decoder layer architecture — only vision resolution and context length differ.
 
 ## LLM — Qwen2.5-0.5B-Instruct GPTQ-Int4 (Component Benchmarks)
 
